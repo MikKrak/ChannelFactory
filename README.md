@@ -42,6 +42,12 @@ The reusable engine should handle research, editorial workflow, publishing, user
 - `config/` — reusable configuration templates.
 - `experiments/` — per-channel experiment configurations and notes.
 
+## Collaborative editing
+
+Shared document editing uses the project **Notebook (Блокнот)** protocol: a Notebook is a native ChatGPT Writing Block with **Open in editor**, while the repository file remains the canonical persistent copy. Opening does not save; synchronization back to GitHub is explicit and conflict-checked.
+
+See `docs/NOTEBOOK_PROTOCOL.md` for the mandatory workflow.
+
 
 ## Architecture principles
 
