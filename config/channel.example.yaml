@@ -1,0 +1,25 @@
+# Example only — no real channel chosen yet.
+channel:
+  id: example
+  platform: telegram
+  name: ""
+  audience: ""
+  value_proposition: ""
+
+editorial:
+  voice: ""
+  policy: ""
+  approval_required: true
+
+experiment:
+  hypothesis: ""
+  budget_limit_eur: 0
+  success_criteria: []
+  checkpoints_days: [7, 14, 30]
+
+llm:
+  strategy: task_based
+  models: {}
+
+monetization:
+  mode: none
