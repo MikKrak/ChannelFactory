@@ -10,9 +10,9 @@ The first target platform is Telegram, but the architecture should remain as cha
 
 ## Current phase
 
-**Phase 0 — technical reconnaissance and system passport.**
+**Current phase — working local prototype and Telegram integration (October 2026).**
 
-Before choosing the first business topic, we will:
+The initial reconnaissance led to a working test channel and local prototype. The original investigation checklist is retained as historical context:
 
 1. Define the capabilities required from the universal factory.
 2. Research existing platforms and components (n8n, Flowise, Botpress, and alternatives).
@@ -95,6 +95,13 @@ A successful migration should not require redesigning channel configurations or 
 
 **Design test:** if replacing Activepieces would force us to rewrite the meaning of a channel, too much ChannelFactory logic has leaked into the automation engine.
 
-## Next step
+## Where to start / assistant orientation
 
-Complete `docs/SYSTEM_PASSPORT.md`, then compare candidate platforms against it.
+- **Canonical repository:** `MikKrak/ChannelFactory`, branch `main`.
+- **`AGENTS.md`** — mandatory project context, working tools and start-of-session checklist.
+- **`STATUS.md`** — latest verified technical state and next experiment; read this before relying on older plans.
+- **`DEVELOPMENT.md`** — product concepts, agreed decisions, research and hypotheses, including new Telegram/AI capabilities.
+- **`PLAN.md`** — historical plan and experiments (some old next steps are superseded).
+- **`docs/NOTEBOOK_PROTOCOL.md`** — collaborative Notebook workflow when requested.
+
+**Current technical focus:** reliable publication bookkeeping and proving receipt of a real reader's direct message to the Telegram channel. GitHub documentation and the local VS Code working tree are not automatically synchronized.
