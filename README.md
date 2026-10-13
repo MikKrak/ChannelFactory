@@ -100,7 +100,8 @@ A successful migration should not require redesigning channel configurations or 
 - **Canonical repository:** `MikKrak/ChannelFactory`, branch `main`.
 - **`AGENTS.md`** — mandatory project context, working tools and start-of-session checklist.
 - **`STATUS.md`** — latest verified technical state and next experiment; read this before relying on older plans.
-- **`DEVELOPMENT.md`** — product concepts, agreed decisions, research and hypotheses, including new Telegram/AI capabilities.
+- **`CONCEPT.md`** — evolving product concept and agreed architecture principles (canonical place for conceptual decisions).
+- **`DEVELOPMENT.md`** — technical research, experiments, alternatives and working notes, including Telegram/AI capabilities.
 - **`PLAN.md`** — historical plan and experiments (some old next steps are superseded).
 - **`docs/NOTEBOOK_PROTOCOL.md`** — collaborative Notebook workflow when requested.
 
