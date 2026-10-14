@@ -40,11 +40,11 @@ The reusable engine should handle research, editorial workflow, publishing, user
 
 - `управление/` — project plan, chat roles, vertical task/result exchange.
 - `концепция/CONCEPT.md` — current canonical product concept; `разработка/DEVELOPMENT.md` — research and technical notes; `STATUS.md` — verified state.
-- `разработка/WORK_PLAN.md` — current technical integration plan; `reference/PLAN.md` — historical experiments.
+- `управление/план-проекта.md` — current short project plan; `reference/PLAN.md` — historical experiments.
 - `docs/NOTEBOOK_PROTOCOL.md` — existing collaborative editing protocol.
-- `CF-application/` — **planned**, not yet created: application source, templates, tests and deployment configuration. Intended Vercel Root Directory: `CF-application` after code inspection.
+- `CF-application/` — existing application source and templates, transferred to GitHub and tested locally. Intended Vercel Root Directory: `CF-application` after code inspection.
 
-Future subject sections `концепция/`, `разработка/` and `reference/` are not yet populated. The earlier `docs/`, `workflows/`, `src/`, `config/`, `experiments/` map described an initial proposed layout, **not a verified inventory of existing folders**. Existing files remain at their current paths until an agreed migration.
+Subject sections `концепция/`, `разработка/` and `reference/` already exist. The earlier `docs/`, `workflows/`, `src/`, `config/`, `experiments/` map described an initial proposed layout, **not a verified inventory of existing folders**. Existing files remain at their current paths until an agreed migration.
 
 ## Collaborative editing
 
@@ -113,4 +113,4 @@ A successful migration should not require redesigning channel configurations or 
 - **`reference/PLAN.md`** — historical plan and experiments (some old next steps are superseded).
 - **`docs/NOTEBOOK_PROTOCOL.md`** — collaborative Notebook workflow when requested.
 
-**Current technical focus:** reliable publication bookkeeping and proving receipt of a real reader's direct message to the Telegram channel. GitHub documentation and the local VS Code working tree are not automatically synchronized.
+**Current technical focus:** reproducible dependencies, GitHub ↔ Mac sync, and later Vercel deployment from the approved `production` branch. Development and Mac testing use `main`; the editor will be protected before public server access. GitHub documentation and the local VS Code working tree are not automatically synchronized.
