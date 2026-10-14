@@ -28,20 +28,14 @@ app = FastAPI(title="Channel Factory")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# ============================================================
 # Главная страница
-# ============================================================
-
 @app.get("/", response_class=HTMLResponse)
 def home():
     html = Path("templates/index.html").read_text(encoding="utf-8")
     return HTMLResponse(content=html)
 
 
-# ============================================================
 # Импорт материалов
-# ============================================================
-
 @app.post("/import")
 def import_articles():
     articles = get_articles(page=2)
@@ -57,10 +51,7 @@ def import_articles():
     }
 
 
-# ============================================================
 # Список материалов
-# ============================================================
-
 @app.get("/materials", response_class=HTMLResponse)
 def show_materials():
     articles = get_materials(20)
@@ -117,10 +108,7 @@ def show_materials():
     """
 
 
-# ============================================================
 # Карточка исходного материала
-# ============================================================
-
 @app.get("/material/{material_id}", response_class=HTMLResponse)
 def show_material(material_id: str):
     article = get_material(material_id)
@@ -155,7 +143,7 @@ def show_material(material_id: str):
         else "<p>Содержание ещё не загружено.</p>"
     )
 
-    # Автоматическая подготовка текста для нового черновика
+    # Предложение для формы; сохранение черновика выполняется отдельным запросом.
     if article_text:
         post = prepare_post(article)
 
@@ -234,10 +222,7 @@ def show_material(material_id: str):
     """
 
 
-# ============================================================
 # Загрузка полного текста исходного материала
-# ============================================================
-
 @app.post("/material/{material_id}/load")
 def load_material_content(material_id: str):
     article = get_material(material_id)
@@ -266,10 +251,7 @@ def load_material_content(material_id: str):
     )
 
 
-# ============================================================
 # Создание черновика публикации из материала
-# ============================================================
-
 @app.post("/material/{material_id}/save-post")
 def save_material_post(
     material_id: str,
@@ -285,8 +267,7 @@ def save_material_post(
 
     post = prepare_post(article)
 
-    # Сохраняем текст, отредактированный пользователем.
-    # Изображение и источник остаются без изменений.
+    # Меняем только текстовый блок; фотография и ссылка остаются из материала.
     for block in post["blocks"]:
         if block.get("type") == "text":
             block["content"] = post_text
@@ -303,10 +284,7 @@ def save_material_post(
     )
 
 
-# ============================================================
 # Список публикаций
-# ============================================================
-
 @app.get("/posts", response_class=HTMLResponse)
 def show_posts(status: str = "all"):
     allowed = {
@@ -408,10 +386,7 @@ def show_posts(status: str = "all"):
     """
 
 
-# ============================================================
 # Карточка публикации
-# ============================================================
-
 @app.get("/post/{post_id}", response_class=HTMLResponse)
 def show_post(post_id: str):
     post = get_post(post_id)
@@ -442,9 +417,7 @@ def show_post(post_id: str):
     for block in post.get("blocks") or []:
         block_type = block.get("type")
 
-        # ----------------------------------------------------
         # Фотография
-        # ----------------------------------------------------
 
         if block_type == "image":
             url = escape(block.get("url") or "", quote=True)
@@ -455,9 +428,7 @@ def show_post(post_id: str):
                     f'style="max-width:100%; border-radius:8px;"></p>'
                 )
 
-        # ----------------------------------------------------
         # Текст публикации
-        # ----------------------------------------------------
 
         elif block_type == "text":
             content = escape(block.get("content") or "")
@@ -497,17 +468,14 @@ def show_post(post_id: str):
                 """
 
             else:
-                # Готовые и опубликованные посты:
-                # только просмотр.
+                # Готовые и опубликованные посты показываем без формы редактирования.
                 blocks_html += (
                     f'<div style="white-space:pre-line;">'
                     f'{content}'
                     f'</div>'
                 )
 
-        # ----------------------------------------------------
         # Ссылка на источник
-        # ----------------------------------------------------
 
         elif block_type == "source":
             url = escape(block.get("url") or "", quote=True)
@@ -555,10 +523,7 @@ def show_post(post_id: str):
     """
 
 
-# ============================================================
 # Сохранение и утверждение черновика
-# ============================================================
-
 @app.post("/post/{post_id}/save")
 def save_post(
     post_id: str,
@@ -593,9 +558,10 @@ def save_post(
         status_code=303,
     )
 
+
+# Выполняет отправку; страница подтверждения обслуживается отдельным маршрутом.
 @app.post("/post/{post_id}/publish-now")
 def publish_post_now(post_id: str):
-
     post = get_post(post_id)
 
     if not post:
@@ -617,6 +583,8 @@ def publish_post_now(post_id: str):
         <p><a href="/posts">Вернуться к списку постов</a></p>
     """)
 
+
+# Здесь показываем подтверждение; отправка выполняется POST-запросом.
 @app.get("/post/{post_id}/publish", response_class=HTMLResponse)
 def confirm_publication(post_id: str):
     post = get_post(post_id)
@@ -648,5 +616,3 @@ def confirm_publication(post_id: str):
     </body>
     </html>
     """
-
-

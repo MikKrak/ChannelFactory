@@ -20,16 +20,19 @@ def count_materials():
     )
     return result.count
 
+
 def save_materials(articles):
+    # Совпадение источника и URL обновляет существующий материал.
     result = (
         db.table("cf_materials")
         .upsert(
             articles,
-            on_conflict="source_id,url"
+            on_conflict="source_id,url",
         )
         .execute()
     )
     return len(result.data or [])
+
 
 def get_materials(limit=10):
     result = (
@@ -41,6 +44,7 @@ def get_materials(limit=10):
     )
     return result.data
 
+
 def get_material(material_id):
     result = (
         db.table("cf_materials")
@@ -51,10 +55,11 @@ def get_material(material_id):
     )
     return result.data[0] if result.data else None
 
+
 def save_article_content(material_id, article):
     content = {
         "text": article["text"],
-        "image_url": article["image_url"]
+        "image_url": article["image_url"],
     }
 
     result = (
@@ -66,17 +71,20 @@ def save_article_content(material_id, article):
 
     return result.data
 
+
 def create_post(material_id, title, blocks):
+    # Создание или обновление черновика поручено функции базы данных.
     result = db.rpc(
         "cf_save_material_draft",
         {
             "p_material_id": material_id,
             "p_title": title,
-            "p_blocks": blocks
-        }
+            "p_blocks": blocks,
+        },
     ).execute()
 
     return result.data
+
 
 def get_posts(status=None, limit=100):
     query = (
@@ -92,6 +100,7 @@ def get_posts(status=None, limit=100):
     result = query.execute()
     return result.data or []
 
+
 def get_post(post_id):
     result = (
         db.table("cf_posts")
@@ -102,6 +111,7 @@ def get_post(post_id):
     )
 
     return result.data[0] if result.data else None
+
 
 def update_post(post_id, post_text, status="draft"):
     if status not in ("draft", "ready"):
@@ -120,11 +130,14 @@ def update_post(post_id, post_text, status="draft"):
 
     result = (
         db.table("cf_posts")
-        .update({
-            "blocks": blocks,
-            "status": status
-        })
+        .update(
+            {
+                "blocks": blocks,
+                "status": status,
+            }
+        )
         .eq("id", post_id)
+        # Повторная проверка статуса при записи защищает от его смены после чтения.
         .eq("status", "draft")
         .execute()
     )
@@ -133,6 +146,7 @@ def update_post(post_id, post_text, status="draft"):
         raise ValueError("Не удалось сохранить черновик")
 
     return result.data[0]
+
 
 def return_post_to_draft(post_id):
     result = (
@@ -148,7 +162,8 @@ def return_post_to_draft(post_id):
 
     return result.data[0]
 
+
+# Ручная диагностика подключения при запуске модуля отдельно.
 if __name__ == "__main__":
     print("Подключаемся к Supabase...")
     print(f"Материалов в базе: {count_materials()}")
-   

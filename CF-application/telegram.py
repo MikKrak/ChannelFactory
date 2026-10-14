@@ -1,4 +1,5 @@
 import os
+
 import requests
 from dotenv import load_dotenv
 
@@ -31,6 +32,7 @@ def publish_to_telegram(post):
 
     api_url = f"https://api.telegram.org/bot{token}"
 
+    # Один вызов API; фотография передаётся файлом после загрузки с источника.
     def send(method, payload):
         url = f"{api_url}/{method}"
 
@@ -82,24 +84,40 @@ def publish_to_telegram(post):
 
     messages = []
 
-    # Короткий текст — одно сообщение с фотографией.
+    # Если текст помещается в подпись, отправляем его вместе с фотографией.
     if image_url and len(text) <= 1024:
-        messages.append(send("sendPhoto", {
-            "photo": image_url,
-            "caption": text,
-        }))
+        messages.append(
+            send(
+                "sendPhoto",
+                {
+                    "photo": image_url,
+                    "caption": text,
+                },
+            )
+        )
 
     else:
         # Длинный текст — сначала фотография.
         if image_url:
-            messages.append(send("sendPhoto", {
-                "photo": image_url,
-            }))
+            messages.append(
+                send(
+                    "sendPhoto",
+                    {
+                        "photo": image_url,
+                    },
+                )
+            )
 
         # Затем текст, частями не более 4096 символов.
         for start in range(0, len(text), 4096):
-            messages.append(send("sendMessage", {
-                "text": text[start:start + 4096],
-            }))
+            messages.append(
+                send(
+                    "sendMessage",
+                    {
+                        "text": text[start:start + 4096],
+                    },
+                )
+            )
 
+    # Возвращаем ответы Telegram вызывающему коду.
     return messages

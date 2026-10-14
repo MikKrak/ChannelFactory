@@ -9,7 +9,7 @@ def get_articles(page=2):
     response = requests.get(
         RSS_URL,
         params={"paged": page},
-        timeout=20
+        timeout=20,
     )
     response.raise_for_status()
 
@@ -22,7 +22,7 @@ def get_articles(page=2):
         {
             "title": item.get("title", ""),
             "url": item.get("link", ""),
-            "published": item.get("published", "")
+            "published": item.get("published", ""),
         }
         for item in feed.entries
     ]
@@ -37,21 +37,26 @@ def prepare_materials(articles):
     for article in articles:
         published = article.get("published", "")
 
+        # Дату RSS переводим в ISO; отсутствие даты сохраняем как None.
         published_at = (
             parsedate_to_datetime(published).isoformat()
             if published else None
         )
 
-        materials.append({
-            "source_id": SOURCE_ID,
-            "url": article["url"],
-            "title": article["title"],
-            "published_at": published_at,
-            "raw_data": article
-        })
+        materials.append(
+            {
+                "source_id": SOURCE_ID,
+                "url": article["url"],
+                "title": article["title"],
+                "published_at": published_at,
+                "raw_data": article,
+            }
+        )
 
     return materials
 
+
+# Ручная проверка RSS при запуске модуля отдельно.
 if __name__ == "__main__":
     articles = get_articles(page=2)
 
