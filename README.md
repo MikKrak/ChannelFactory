@@ -39,8 +39,8 @@ The reusable engine should handle research, editorial workflow, publishing, user
 **Current canonical navigation:** [INDEX.md](INDEX.md). Governance rules: [PROJECT_RULES.md](PROJECT_RULES.md); agent instructions: [AGENTS.md](AGENTS.md).
 
 - `управление/` — project plan, chat roles, vertical task/result exchange.
-- `CONCEPT.md` — current canonical product concept; `DEVELOPMENT.md` — research and technical notes; `STATUS.md` — verified state.
-- `WORK_PLAN.md` — current technical integration plan; `PLAN.md` — historical experiments.
+- `концепция/CONCEPT.md` — current canonical product concept; `разработка/DEVELOPMENT.md` — research and technical notes; `STATUS.md` — verified state.
+- `разработка/WORK_PLAN.md` — current technical integration plan; `reference/PLAN.md` — historical experiments.
 - `docs/NOTEBOOK_PROTOCOL.md` — existing collaborative editing protocol.
 - `CF-application/` — **planned**, not yet created: application source, templates, tests and deployment configuration. Intended Vercel Root Directory: `CF-application` after code inspection.
 
@@ -105,12 +105,12 @@ A successful migration should not require redesigning channel configurations or 
 - **`INDEX.md`** — current repository map and document navigation.
 - **`PROJECT_RULES.md`** — agreed governance, direct GitHub plugin workflow and approval rules.
 - **`управление/структура-чатов.md`** and **`управление/иерархический-обмен.md`** — role map and vertical exchange.
-- **`WORK_PLAN.md`** — current Mac/GitHub/Vercel/Supabase integration plan.
+- **`разработка/WORK_PLAN.md`** — current Mac/GitHub/Vercel/Supabase integration plan.
 - **`AGENTS.md`** — mandatory project context, working tools and start-of-session checklist.
 - **`STATUS.md`** — latest verified technical state and next experiment; read this before relying on older plans.
-- **`CONCEPT.md`** — evolving product concept and agreed architecture principles (canonical place for conceptual decisions).
-- **`DEVELOPMENT.md`** — technical research, experiments, alternatives and working notes, including Telegram/AI capabilities.
-- **`PLAN.md`** — historical plan and experiments (some old next steps are superseded).
+- **`концепция/CONCEPT.md`** — evolving product concept and agreed architecture principles (canonical place for conceptual decisions).
+- **`разработка/DEVELOPMENT.md`** — technical research, experiments, alternatives and working notes, including Telegram/AI capabilities.
+- **`reference/PLAN.md`** — historical plan and experiments (some old next steps are superseded).
 - **`docs/NOTEBOOK_PROTOCOL.md`** — collaborative Notebook workflow when requested.
 
 **Current technical focus:** reliable publication bookkeeping and proving receipt of a real reader's direct message to the Telegram channel. GitHub documentation and the local VS Code working tree are not automatically synchronized.
