@@ -36,11 +36,15 @@ The reusable engine should handle research, editorial workflow, publishing, user
 
 ## Repository map
 
-- `docs/` — system passport, architecture, research, and decisions.
-- `workflows/` — exported automation/agent workflows.
-- `src/` — custom code only where needed.
-- `config/` — reusable configuration templates.
-- `experiments/` — per-channel experiment configurations and notes.
+**Current canonical navigation:** [INDEX.md](INDEX.md). Governance rules: [PROJECT_RULES.md](PROJECT_RULES.md); agent instructions: [AGENTS.md](AGENTS.md).
+
+- `управление/` — project plan, chat roles, vertical task/result exchange.
+- `CONCEPT.md` — current canonical product concept; `DEVELOPMENT.md` — research and technical notes; `STATUS.md` — verified state.
+- `WORK_PLAN.md` — current technical integration plan; `PLAN.md` — historical experiments.
+- `docs/NOTEBOOK_PROTOCOL.md` — existing collaborative editing protocol.
+- `CF-application/` — **planned**, not yet created: application source, templates, tests and deployment configuration. Intended Vercel Root Directory: `CF-application` after code inspection.
+
+Future subject sections `концепция/`, `разработка/` and `reference/` are not yet populated. The earlier `docs/`, `workflows/`, `src/`, `config/`, `experiments/` map described an initial proposed layout, **not a verified inventory of existing folders**. Existing files remain at their current paths until an agreed migration.
 
 ## Collaborative editing
 
@@ -98,6 +102,10 @@ A successful migration should not require redesigning channel configurations or 
 ## Where to start / assistant orientation
 
 - **Canonical repository:** `MikKrak/ChannelFactory`, branch `main`.
+- **`INDEX.md`** — current repository map and document navigation.
+- **`PROJECT_RULES.md`** — agreed governance, direct GitHub plugin workflow and approval rules.
+- **`управление/структура-чатов.md`** and **`управление/иерархический-обмен.md`** — role map and vertical exchange.
+- **`WORK_PLAN.md`** — current Mac/GitHub/Vercel/Supabase integration plan.
 - **`AGENTS.md`** — mandatory project context, working tools and start-of-session checklist.
 - **`STATUS.md`** — latest verified technical state and next experiment; read this before relying on older plans.
 - **`CONCEPT.md`** — evolving product concept and agreed architecture principles (canonical place for conceptual decisions).
