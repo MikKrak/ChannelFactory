@@ -1,6 +1,13 @@
 <!DOCTYPE html>
+<!--
+index.html — главная страница редактора ChannelFactory.
+Показывает текущий канал и переходы к материалам и постам.
+Форма импорта отправляет POST-запрос; просмотр списков — GET-запросы.
+Шаблон читает обработчик главной страницы в main.py.
+-->
 <html lang="ru">
 
+<!-- Метаданные страницы и общая таблица стилей -->
 <head>
     <meta charset="UTF-8">
     <title>Channel Factory</title>
@@ -8,20 +15,25 @@
 </head>
 
 <body>
+    <!-- Заголовок приложения и рабочая панель канала -->
     <main>
         <h1>Channel Factory</h1>
         <p class="subtitle">Фабрика Telegram-каналов</p>
 
+        <!-- Текущий канал и источник материалов -->
         <section class="panel">
             <h2>СССР — Свой сад своими руками</h2>
             <p>Источник: Ботаничка</p>
 
+            <!-- Импорт статей: получение RSS и сохранение материалов в базе -->
             <form action="/import" method="post">
                 <button type="submit">Получить статьи</button>
             </form>
+            <!-- Переход к списку исходных материалов -->
             <form action="/materials" method="get">
                 <button type="submit">Посмотреть материалы</button>
             </form>
+            <!-- Переход к списку редакционных постов -->
             <form action="/posts" method="get">
                 <button type="submit">Редакционные посты</button>
             </form>

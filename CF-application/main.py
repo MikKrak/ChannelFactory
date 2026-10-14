@@ -1,3 +1,14 @@
+"""
+main.py — веб-интерфейс редактора ChannelFactory.
+
+Принимает запросы браузера: импорт материалов, подготовка и редактирование
+постов, подтверждение и отправка в Telegram. Работу с данными, источником
+и публикацией передаёт отдельным модулям.
+
+HTML страниц формируется здесь; главная страница читается из шаблона.
+Пути static и templates отсчитываются от рабочей директории запуска.
+"""
+
 from html import escape
 from pathlib import Path
 
@@ -23,21 +34,27 @@ from extractor import extract_article
 from source import get_articles, prepare_materials
 
 
+# --- Приложение и статические ресурсы ---
+
 app = FastAPI(title="Channel Factory")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-# Главная страница
+# --- Главная страница ---
 @app.get("/", response_class=HTMLResponse)
 def home():
+    """Показать главную страницу из HTML-шаблона."""
+
     html = Path("templates/index.html").read_text(encoding="utf-8")
     return HTMLResponse(content=html)
 
 
-# Импорт материалов
+# --- Импорт материалов ---
 @app.post("/import")
 def import_articles():
+    """Получить вторую страницу RSS, сохранить материалы и вернуть счётчики."""
+
     articles = get_articles(page=2)
     materials = prepare_materials(articles)
 
@@ -51,11 +68,14 @@ def import_articles():
     }
 
 
-# Список материалов
+# --- Список материалов ---
 @app.get("/materials", response_class=HTMLResponse)
 def show_materials():
+    """Показать последние 20 материалов со ссылками на их карточки."""
+
     articles = get_materials(20)
 
+    # Данные из базы экранируем перед включением в HTML.
     rows = ""
 
     for article in articles:
@@ -108,9 +128,11 @@ def show_materials():
     """
 
 
-# Карточка исходного материала
+# --- Карточка исходного материала ---
 @app.get("/material/{material_id}", response_class=HTMLResponse)
 def show_material(material_id: str):
+    """Показать материал и предложенный текст для формы создания черновика."""
+
     article = get_material(material_id)
 
     if not article:
@@ -222,9 +244,11 @@ def show_material(material_id: str):
     """
 
 
-# Загрузка полного текста исходного материала
+# --- Загрузка полного текста исходного материала ---
 @app.post("/material/{material_id}/load")
 def load_material_content(material_id: str):
+    """Загрузить и сохранить содержание статьи, если текст ещё отсутствует."""
+
     article = get_material(material_id)
 
     if not article:
@@ -251,12 +275,14 @@ def load_material_content(material_id: str):
     )
 
 
-# Создание черновика публикации из материала
+# --- Создание черновика публикации из материала ---
 @app.post("/material/{material_id}/save-post")
 def save_material_post(
     material_id: str,
     post_text: str = Form(...),
 ):
+    """Сохранить черновик из материала с текстом, полученным из формы."""
+
     article = get_material(material_id)
 
     if not article:
@@ -284,9 +310,11 @@ def save_material_post(
     )
 
 
-# Список публикаций
+# --- Список публикаций ---
 @app.get("/posts", response_class=HTMLResponse)
 def show_posts(status: str = "all"):
+    """Показать список постов с выбранным фильтром статуса."""
+
     allowed = {
         "all": "Все",
         "draft": "Черновики",
@@ -314,6 +342,7 @@ def show_posts(status: str = "all"):
         "published": "Опубликован",
     }
 
+    # Данные из базы экранируем перед включением в HTML.
     rows = ""
 
     for post in posts:
@@ -386,9 +415,11 @@ def show_posts(status: str = "all"):
     """
 
 
-# Карточка публикации
+# --- Карточка публикации ---
 @app.get("/post/{post_id}", response_class=HTMLResponse)
 def show_post(post_id: str):
+    """Показать блоки поста; для черновика вывести форму редактирования."""
+
     post = get_post(post_id)
 
     if not post:
@@ -523,13 +554,15 @@ def show_post(post_id: str):
     """
 
 
-# Сохранение и утверждение черновика
+# --- Сохранение и утверждение черновика ---
 @app.post("/post/{post_id}/save")
 def save_post(
     post_id: str,
     post_text: str = Form(...),
     action: str = Form(...),
 ):
+    """Сохранить текст черновика или перевести его в готовые публикации."""
+
     if action not in ("save", "ready"):
         return HTMLResponse(
             content="Недопустимое действие",
@@ -559,9 +592,13 @@ def save_post(
     )
 
 
+# --- Отправка в Telegram ---
+
 # Выполняет отправку; страница подтверждения обслуживается отдельным маршрутом.
 @app.post("/post/{post_id}/publish-now")
 def publish_post_now(post_id: str):
+    """Отправить пост в Telegram; результат отправки в базу не записывается."""
+
     post = get_post(post_id)
 
     if not post:
@@ -584,9 +621,13 @@ def publish_post_now(post_id: str):
     """)
 
 
+# --- Подтверждение публикации ---
+
 # Здесь показываем подтверждение; отправка выполняется POST-запросом.
 @app.get("/post/{post_id}/publish", response_class=HTMLResponse)
 def confirm_publication(post_id: str):
+    """Показать форму подтверждения без отправки поста в Telegram."""
+
     post = get_post(post_id)
 
     if not post:

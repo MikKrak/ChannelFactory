@@ -1,3 +1,10 @@
+/*
+style.css — общее оформление страниц редактора ChannelFactory.
+Задаёт фон, ширину содержимого, панели и кнопки.
+Применяется к HTML-шаблону и страницам, собранным в main.py.
+*/
+
+/* --- Основной фон и шрифт --- */
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: #f5f6f8;
@@ -6,11 +13,13 @@ body {
     padding: 40px;
 }
 
+/* --- Ширина и положение содержимого --- */
 main {
     max-width: 900px;
     margin: 0 auto;
 }
 
+/* --- Заголовок и подзаголовок --- */
 h1 {
     margin-bottom: 5px;
 }
@@ -20,6 +29,7 @@ h1 {
     margin-bottom: 35px;
 }
 
+/* --- Панели содержимого --- */
 .panel {
     background: white;
     padding: 30px;
@@ -27,6 +37,7 @@ h1 {
     box-shadow: 0 2px 12px #00000010;
 }
 
+/* --- Кнопки действий --- */
 button {
     background: #2563eb;
     color: white;
@@ -38,6 +49,7 @@ button {
     font-size: 14px;
 }
 
+/* --- Кнопка при наведении --- */
 button:hover {
     background: #1d4ed8;
 }

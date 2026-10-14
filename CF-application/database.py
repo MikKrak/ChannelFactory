@@ -1,7 +1,19 @@
+"""
+database.py — чтение и сохранение материалов и постов в Supabase.
+
+Работает с таблицами cf_materials и cf_posts; создание или обновление
+черновика передаёт функции базы cf_save_material_draft.
+
+При импорте загружает конфигурацию и создаёт клиент подключения.
+Не публикует посты в Telegram и не формирует веб-страницы.
+"""
+
 import os
 
 from dotenv import load_dotenv
 from supabase import create_client
+
+# --- Конфигурация и подключение ---
 
 load_dotenv()
 
@@ -11,7 +23,11 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
+# --- Материалы: чтение и сохранение ---
+
 def count_materials():
+    """Получить точное количество материалов без загрузки всех записей."""
+
     result = (
         db.table("cf_materials")
         .select("id", count="exact")
@@ -23,6 +39,8 @@ def count_materials():
 
 def save_materials(articles):
     # Совпадение источника и URL обновляет существующий материал.
+    """Добавить или обновить материалы по паре source_id и url."""
+
     result = (
         db.table("cf_materials")
         .upsert(
@@ -35,6 +53,8 @@ def save_materials(articles):
 
 
 def get_materials(limit=10):
+    """Получить последние материалы, начиная с более новой даты публикации."""
+
     result = (
         db.table("cf_materials")
         .select("id,title,url,published_at")
@@ -46,6 +66,8 @@ def get_materials(limit=10):
 
 
 def get_material(material_id):
+    """Найти материал по идентификатору; вернуть None, если его нет."""
+
     result = (
         db.table("cf_materials")
         .select("*")
@@ -57,6 +79,8 @@ def get_material(material_id):
 
 
 def save_article_content(material_id, article):
+    """Сохранить извлечённые текст и адрес изображения в поле content."""
+
     content = {
         "text": article["text"],
         "image_url": article["image_url"],
@@ -72,8 +96,12 @@ def save_article_content(material_id, article):
     return result.data
 
 
+# --- Посты: создание и чтение ---
+
 def create_post(material_id, title, blocks):
     # Создание или обновление черновика поручено функции базы данных.
+    """Передать создание или обновление черновика функции базы данных."""
+
     result = db.rpc(
         "cf_save_material_draft",
         {
@@ -87,6 +115,8 @@ def create_post(material_id, title, blocks):
 
 
 def get_posts(status=None, limit=100):
+    """Получить последние изменённые посты с необязательным фильтром статуса."""
+
     query = (
         db.table("cf_posts")
         .select("id,title,status,updated_at")
@@ -102,6 +132,8 @@ def get_posts(status=None, limit=100):
 
 
 def get_post(post_id):
+    """Найти пост по идентификатору; вернуть None, если его нет."""
+
     result = (
         db.table("cf_posts")
         .select("*")
@@ -113,7 +145,11 @@ def get_post(post_id):
     return result.data[0] if result.data else None
 
 
+# --- Посты: редактирование и смена статуса ---
+
 def update_post(post_id, post_text, status="draft"):
+    """Обновить существующие текстовые блоки черновика и его статус."""
+
     if status not in ("draft", "ready"):
         raise ValueError("Недопустимый статус")
 
@@ -149,6 +185,8 @@ def update_post(post_id, post_text, status="draft"):
 
 
 def return_post_to_draft(post_id):
+    """Вернуть готовый пост в черновики; другой статус не изменять."""
+
     result = (
         db.table("cf_posts")
         .update({"status": "draft"})
@@ -164,6 +202,8 @@ def return_post_to_draft(post_id):
 
 
 # Ручная диагностика подключения при запуске модуля отдельно.
+# --- Ручная диагностика ---
+
 if __name__ == "__main__":
     print("Подключаемся к Supabase...")
     print(f"Материалов в базе: {count_materials()}")

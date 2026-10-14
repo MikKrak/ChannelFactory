@@ -1,8 +1,20 @@
+"""
+extractor.py — загрузка полного содержания статьи с сайта.
+
+Получает HTML по URL, извлекает заголовок, текст и адрес обложки.
+Селектор основного текста рассчитан на разметку Ботанички.
+Возвращает словарь статьи; не сохраняет его в базу.
+"""
+
 import requests
 from bs4 import BeautifulSoup
 
 
+# --- Загрузка страницы ---
+
 def load_page(url):
+    """Скачать HTML страницы; при HTTP-ошибке прервать обработку."""
+
     response = requests.get(
         url,
         timeout=20,
@@ -12,7 +24,11 @@ def load_page(url):
     return response.text
 
 
+# --- Извлечение содержания ---
+
 def extract_article(url):
+    """Извлечь данные статьи из HTML и вернуть их без сохранения."""
+
     html = load_page(url)
     soup = BeautifulSoup(html, "html.parser")
 
@@ -43,6 +59,8 @@ def extract_article(url):
 
 
 # Ручная проверка извлечения статьи при запуске модуля отдельно.
+# --- Ручная проверка ---
+
 if __name__ == "__main__":
     url = "https://www.botanichka.ru/article/10-shagov-kak-podgotovit-pochvu-k-sleduyushhemu-sezonu-prakticheskij-algoritm-osennego-uhoda/"
     article = extract_article(url)

@@ -1,15 +1,34 @@
+"""
+telegram.py — отправка блоков поста через Telegram Bot API.
+
+Собирает текст и ссылку на источник, при наличии загружает фотографию.
+Отправляет фотографию с подписью либо фотографию и отдельные части текста.
+Возвращает список ответов Telegram; статус поста в базе не обновляет.
+
+При импорте загружает конфигурацию; токен и канал читает при публикации.
+"""
+
 import os
 
 import requests
 from dotenv import load_dotenv
 
+# --- Загрузка конфигурации ---
+
 load_dotenv()
 
 
+# --- Публикация поста ---
+
 def publish_to_telegram(post):
+    """Отправить пост в настроенный канал и вернуть ответы Telegram."""
+
+    # --- Параметры отправки ---
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
+    # --- Сборка блоков ---
+    # При нескольких изображениях используется последнее.
     image_url = None
     text_parts = []
 
@@ -30,10 +49,13 @@ def publish_to_telegram(post):
     if not text:
         raise ValueError("У поста нет текста")
 
+    # --- Запросы к Telegram ---
     api_url = f"https://api.telegram.org/bot{token}"
 
     # Один вызов API; фотография передаётся файлом после загрузки с источника.
     def send(method, payload):
+        """Выполнить запрос отправки фотографии или текста и проверить ответ API."""
+
         url = f"{api_url}/{method}"
 
         if method == "sendPhoto":
@@ -82,6 +104,7 @@ def publish_to_telegram(post):
 
         return result["result"]
 
+    # --- Порядок отправки и разбиение текста ---
     messages = []
 
     # Если текст помещается в подпись, отправляем его вместе с фотографией.

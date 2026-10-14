@@ -1,11 +1,25 @@
+"""
+source.py — получение списка статей из RSS Ботанички.
+
+Загружает выбранную страницу ленты и преобразует записи в материалы
+для последующего сохранения: источник, URL, заголовок, дата и исходные данные.
+Полный текст статьи не загружает и в базу самостоятельно не записывает.
+"""
+
 import requests
 import feedparser
 from email.utils import parsedate_to_datetime
 
+# --- Адрес источника ---
+
 RSS_URL = "https://www.botanichka.ru/feed/"
 
 
+# --- Получение записей RSS ---
+
 def get_articles(page=2):
+    """Загрузить страницу RSS и вернуть заголовки, ссылки и даты статей."""
+
     response = requests.get(
         RSS_URL,
         params={"paged": page},
@@ -28,10 +42,16 @@ def get_articles(page=2):
     ]
 
 
+# --- Связь с источником в базе ---
+
 SOURCE_ID = "e3c9eb83-5a5f-4351-836b-c2f93b4fa567"
 
 
+# --- Подготовка материалов к сохранению ---
+
 def prepare_materials(articles):
+    """Преобразовать записи RSS в словари для таблицы материалов."""
+
     materials = []
 
     for article in articles:
@@ -57,6 +77,8 @@ def prepare_materials(articles):
 
 
 # Ручная проверка RSS при запуске модуля отдельно.
+# --- Ручная проверка ---
+
 if __name__ == "__main__":
     articles = get_articles(page=2)
 
