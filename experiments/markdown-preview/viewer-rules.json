@@ -1,0 +1,33 @@
+{
+  "headings": {
+    "h1": {
+      "color": "#2459b3",
+      "sizeEm": 1.7
+    },
+    "h2": {
+      "color": "#287344",
+      "sizeEm": 1.3
+    },
+    "h3": {
+      "color": "#287344",
+      "sizeEm": 1.1
+    }
+  },
+  "markdownLinks": {
+    "mode": "inline-disclosure",
+    "initiallyOpen": false,
+    "maxDepth": 3,
+    "cycles": "link-only",
+    "loading": "render-with-page",
+    "controls": {
+      "label": "navigate",
+      "arrow": "toggle-inline",
+      "repeatArrow": "collapse"
+    },
+    "navigationSections": [
+      "Содержание",
+      "Навигация"
+    ],
+    "hideNavigationWhenEmbedded": true
+  }
+}
