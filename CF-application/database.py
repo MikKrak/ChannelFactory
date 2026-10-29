@@ -9,13 +9,16 @@ database.py — чтение и сохранение материалов и п�
 """
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from supabase import create_client
 
+from editor import replace_text
+
 # --- Конфигурация и подключение ---
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -158,11 +161,9 @@ def update_post(post_id, post_text, status="draft"):
     if not post or post["status"] != "draft":
         raise ValueError("Редактировать можно только черновик")
 
-    blocks = post.get("blocks") or []
-
-    for block in blocks:
-        if block.get("type") == "text":
-            block["content"] = post_text
+    if not post_text.strip():
+        raise ValueError("Текст поста не может быть пустым")
+    blocks = replace_text(post.get("blocks"), post_text)
 
     result = (
         db.table("cf_posts")
@@ -207,3 +208,39 @@ def return_post_to_draft(post_id):
 if __name__ == "__main__":
     print("Подключаемся к Supabase...")
     print(f"Материалов в базе: {count_materials()}")
+
+
+def find_material_draft(material_id):
+    """Найти существующий черновик материала после сохранения через RPC."""
+    result = (db.table("cf_posts").select("*")
+              .eq("material_id", material_id).eq("status", "draft")
+              .order("updated_at", desc=True).limit(1).execute())
+    return result.data[0] if result.data else None
+
+
+# --- Выборки и счётчики для кабинета ---
+
+def count_posts(status):
+    """Получить точное число постов в выбранном статусе."""
+    result = (db.table("cf_posts").select("id", count="exact")
+              .eq("status", status).limit(1).execute())
+    return result.count or 0
+
+
+def list_materials(offset=0, limit=20, search=""):
+    """Получить страницу общей библиотеки и общее число совпадений."""
+    query = db.table("cf_materials").select("id,title,url,published_at", count="exact")
+    if search.strip():
+        escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.ilike("title", "%" + escaped + "%")
+    result = query.order("published_at", desc=True).order("id").range(offset, offset + limit - 1).execute()
+    return result.data or [], result.count or 0
+
+
+def list_posts(offset=0, limit=20, status="all"):
+    """Получить страницу постов с устойчивым порядком при одинаковом времени."""
+    query = db.table("cf_posts").select("id,title,status,updated_at")
+    if status in ("draft", "ready", "published"):
+        query = query.eq("status", status)
+    return (query.order("updated_at", desc=True).order("id")
+            .range(offset, offset + limit - 1).execute()).data or []

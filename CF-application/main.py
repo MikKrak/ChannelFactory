@@ -6,7 +6,8 @@ main.py — веб-интерфейс редактора ChannelFactory.
 и публикацией передаёт отдельным модулям.
 
 HTML страниц формируется здесь; главная страница читается из шаблона.
-Пути static и templates отсчитываются от рабочей директории запуска.
+Статические ресурсы разрешаются относительно расположения этого модуля.
+Новый редакционный кабинет находится в studio.py и studio_views.py.
 """
 
 from html import escape
@@ -16,7 +17,7 @@ from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from telegram import publish_to_telegram
+from publication_routes import router as publication_router
 
 from database import (
     count_materials,
@@ -29,7 +30,8 @@ from database import (
     save_materials,
     update_post,
 )
-from editor import prepare_post
+from editor import prepare_post, replace_text
+from studio import router as studio_router
 from extractor import extract_article
 from source import get_articles, prepare_materials
 
@@ -38,16 +40,18 @@ from source import get_articles, prepare_materials
 
 app = FastAPI(title="Channel Factory")
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+APP_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+app.include_router(studio_router)
+app.include_router(publication_router)
 
 
 # --- Главная страница ---
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """Показать главную страницу из HTML-шаблона."""
+    """Открыть список проектов нового кабинета."""
 
-    html = Path("templates/index.html").read_text(encoding="utf-8")
-    return HTMLResponse(content=html)
+    return RedirectResponse(url="/studio", status_code=303)
 
 
 # --- Импорт материалов ---
@@ -293,10 +297,9 @@ def save_material_post(
 
     post = prepare_post(article)
 
-    # Меняем только текстовый блок; фотография и ссылка остаются из материала.
-    for block in post["blocks"]:
-        if block.get("type") == "text":
-            block["content"] = post_text
+    if not post_text.strip():
+        return HTMLResponse("Текст поста не может быть пустым", status_code=400)
+    post["blocks"] = replace_text(post["blocks"], post_text)
 
     create_post(
         material_id=material_id,
@@ -592,68 +595,5 @@ def save_post(
     )
 
 
-# --- Отправка в Telegram ---
-
-# Выполняет отправку; страница подтверждения обслуживается отдельным маршрутом.
-@app.post("/post/{post_id}/publish-now")
-def publish_post_now(post_id: str):
-    """Отправить пост в Telegram; результат отправки в базу не записывается."""
-
-    post = get_post(post_id)
-
-    if not post:
-        return HTMLResponse("Пост не найден", status_code=404)
-
-    if post.get("status") == "published":
-        return HTMLResponse("Пост уже опубликован", status_code=400)
-
-    try:
-        publish_to_telegram(post)
-    except Exception as error:
-        return HTMLResponse(
-            f"<h1>Ошибка публикации</h1><pre>{escape(str(error))}</pre>",
-            status_code=500,
-        )
-
-    return HTMLResponse("""
-        <h1>Публикация отправлена в Telegram!</h1>
-        <p><a href="/posts">Вернуться к списку постов</a></p>
-    """)
-
-
-# --- Подтверждение публикации ---
-
-# Здесь показываем подтверждение; отправка выполняется POST-запросом.
-@app.get("/post/{post_id}/publish", response_class=HTMLResponse)
-def confirm_publication(post_id: str):
-    """Показать форму подтверждения без отправки поста в Telegram."""
-
-    post = get_post(post_id)
-
-    if not post:
-        return HTMLResponse("Пост не найден", status_code=404)
-
-    title = escape(post.get("title") or "Без названия")
-
-    return f"""
-    <html lang="ru">
-    <head>
-        <meta charset="UTF-8">
-        <title>Подтверждение публикации</title>
-    </head>
-    <body>
-        <h1>Опубликовать в Telegram?</h1>
-        <h2>{title}</h2>
-
-        <p>Канал: СССР — Свой сад своими руками</p>
-
-        <form action="/post/{post_id}/publish-now" method="post">
-            <button type="submit">Да, опубликовать</button>
-        </form>
-
-        <p>
-            <a href="/post/{post_id}">Отмена</a>
-        </p>
-    </body>
-    </html>
-    """
+# Публикация и подтверждение вынесены в publication_routes.py.
+# Старые URL используют тот же сервис и журнал, что и кабинет.

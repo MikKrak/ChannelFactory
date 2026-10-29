@@ -24,12 +24,15 @@ def prepare_post(article):
     source_url = article.get("url") or ""
 
     # --- Краткий текст поста ---
-    # Берём первые 500 символов и удаляем часть после последнего пробела.
-    # Текущее правило применяется и к тексту короче 500 символов.
-    excerpt = text[:500].rsplit(" ", 1)[0] if text else ""
-
-    # При наличии выдержки добавляем многоточие; иначе оставляем заголовок.
-    post_text = f"{title}\n\n{excerpt}..." if excerpt else title
+    # Короткие статьи сохраняем полностью, многоточие — только при сокращении.
+    text = text.strip()
+    excerpt = text
+    if len(text) > 500:
+        excerpt = text[:500]
+        if not text[500].isspace() and not excerpt[-1].isspace():
+            excerpt = excerpt.rsplit(" ", 1)[0] if " " in excerpt else excerpt
+        excerpt = excerpt.rstrip() + "…"
+    post_text = "\n\n".join(part for part in (title, excerpt) if part)
 
     # --- Блоки поста ---
     # Сохраняем порядок: изображение → текст → источник.
@@ -65,3 +68,26 @@ def prepare_post(article):
         "title": title,
         "blocks": blocks,
     }
+
+
+def replace_text(blocks, text):
+    """Заменить текстовые блоки одним, сохранив изображение и источник.
+
+    Если текстового блока ещё нет, добавить его перед ссылкой на источник.
+    Входные блоки не изменяются: их копии пригодны для сохранения в базе.
+    """
+    result = []
+    inserted = False
+    for block in blocks or []:
+        if block.get("type") == "text":
+            if not inserted:
+                result.append({"type": "text", "content": text})
+                inserted = True
+        else:
+            if block.get("type") == "source" and not inserted:
+                result.append({"type": "text", "content": text})
+                inserted = True
+            result.append(dict(block))
+    if not inserted:
+        result.append({"type": "text", "content": text})
+    return result
