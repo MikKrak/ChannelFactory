@@ -43,7 +43,8 @@ def layout(title, body, active='overview', message=''):
     nav = ''.join(f'<a class="{"active" if active == key else ""}" href="{href}"><span>{symbol}</span>{label}</a>' for key, href, symbol, label in [
         ('overview', BASE, '◫', 'Обзор проекта'),
         ('materials', BASE + '/materials', '▤', 'Материалы'),
-        ('posts', BASE + '/posts', '▣', 'Редакционные посты')])
+        ('posts', BASE + '/posts', '▣', 'Редакционные посты'),
+        ('inbox', BASE + '/inbox', '✉', 'Обращения')])
     return f'''<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)} · ChannelFactory</title>
 <link rel="stylesheet" href="/static/studio.css"><script defer src="/static/studio.js"></script></head><body>

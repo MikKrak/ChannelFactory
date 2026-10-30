@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from publication_routes import router as publication_router
+from inbox_routes import router as inbox_router
 
 from database import (
     count_materials,
@@ -44,6 +45,7 @@ APP_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 app.include_router(studio_router)
 app.include_router(publication_router)
+app.include_router(inbox_router)
 
 
 # --- Главная страница ---
