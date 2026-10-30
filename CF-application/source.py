@@ -1,5 +1,7 @@
 """
-source.py — получение списка статей из RSS Ботанички.
+source.py — получение списка статей из выбранной RSS-ленты.
+
+Ботаничка остаётся источником по умолчанию для прежнего ручного импорта.
 
 Загружает выбранную страницу ленты и преобразует записи в материалы
 для последующего сохранения: источник, URL, заголовок, дата и исходные данные.
@@ -17,11 +19,11 @@ RSS_URL = "https://www.botanichka.ru/feed/"
 
 # --- Получение записей RSS ---
 
-def get_articles(page=2):
+def get_articles(page=2, feed_url=RSS_URL):
     """Загрузить страницу RSS и вернуть заголовки, ссылки и даты статей."""
 
     response = requests.get(
-        RSS_URL,
+        feed_url,
         params={"paged": page},
         timeout=20,
     )
@@ -49,7 +51,7 @@ SOURCE_ID = "e3c9eb83-5a5f-4351-836b-c2f93b4fa567"
 
 # --- Подготовка материалов к сохранению ---
 
-def prepare_materials(articles):
+def prepare_materials(articles, source_id=SOURCE_ID):
     """Преобразовать записи RSS в словари для таблицы материалов."""
 
     materials = []
@@ -65,7 +67,7 @@ def prepare_materials(articles):
 
         materials.append(
             {
-                "source_id": SOURCE_ID,
+                "source_id": source_id,
                 "url": article["url"],
                 "title": article["title"],
                 "published_at": published_at,

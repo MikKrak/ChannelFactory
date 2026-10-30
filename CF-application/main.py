@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from publication_routes import router as publication_router
 from inbox_routes import router as inbox_router
+from library_routes import router as library_router
 
 from database import (
     count_materials,
@@ -46,6 +47,7 @@ app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="stati
 app.include_router(studio_router)
 app.include_router(publication_router)
 app.include_router(inbox_router)
+app.include_router(library_router)
 
 
 # --- Главная страница ---
@@ -61,6 +63,11 @@ def home():
 def import_articles():
     """Получить вторую страницу RSS, сохранить материалы и вернуть счётчики."""
 
+    from library import enabled, LibraryRepository
+    if enabled():
+        from database import db
+        from source import SOURCE_ID
+        return LibraryRepository(db).import_rss(SOURCE_ID, page=2)
     articles = get_articles(page=2)
     materials = prepare_materials(articles)
 

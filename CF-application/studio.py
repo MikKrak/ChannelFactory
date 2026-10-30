@@ -51,13 +51,16 @@ def projects():
 @guarded
 def overview():
     counts = {status: db.count_posts(status) for status in ('draft', 'ready')}
-    return view.overview(db.count_materials(), db.get_posts(status='draft', limit=4), counts)
+    from library import enabled, LibraryRepository
+    material_count = LibraryRepository(db.db).materials(project='cccp')[1] if enabled() else db.count_materials()
+    return view.overview(material_count, db.get_posts(status='draft', limit=4), counts)
 
 
 @router.get(view.BASE + '/materials')
 @guarded
 def materials(offset: int = Query(0, ge=0), q: str = Query('', max_length=150)):
-    items, total = db.list_materials(offset=offset, search=q)
+    from library import enabled, LibraryRepository
+    items, total = LibraryRepository(db.db).materials(project='cccp', offset=offset, search=q) if enabled() else db.list_materials(offset=offset, search=q)
     return view.material_list(items, total, offset, 20, q)
 
 

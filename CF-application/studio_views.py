@@ -38,21 +38,27 @@ def notice(text, kind='info'):
     return f'<div class="notice {e(kind)}" role="status">{e(text)}</div>' if text else ''
 
 
-def layout(title, body, active='overview', message=''):
+def layout(title, body, active='overview', message='', global_scope=False):
     """Общая оболочка всех экранов, с обычными серверными ссылками."""
     nav = ''.join(f'<a class="{"active" if active == key else ""}" href="{href}"><span>{symbol}</span>{label}</a>' for key, href, symbol, label in [
         ('overview', BASE, '◫', 'Обзор проекта'),
         ('materials', BASE + '/materials', '▤', 'Материалы'),
+        ('sources', BASE + '/sources', '◉', 'Источники'),
         ('posts', BASE + '/posts', '▣', 'Редакционные посты'),
         ('inbox', BASE + '/inbox', '✉', 'Обращения')])
+    if global_scope:
+        nav = '<a href="/studio/library/sources">Источники</a><a href="/studio/library/materials">Общие материалы</a><a href="/studio/library/cleanup">Просмотр очистки</a>'
+    scope_label = 'ОБЩАЯ БИБЛИОТЕКА' if global_scope else 'ТЕКУЩИЙ ПРОЕКТ'
+    project_name = '<b>Библиотека фабрики</b>' if global_scope else '<span class="leaf">♧</span><b>СССР<small>Свой сад своими руками</small></b>'
+    breadcrumb = 'Общая библиотека' if global_scope else 'СССР'
     return f'''<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)} · ChannelFactory</title>
 <link rel="stylesheet" href="/static/studio.css"><script defer src="/static/studio.js"></script></head><body>
 <aside class="sidebar"><a class="brand" href="/studio"><span class="brandmark">↗</span>ChannelFactory</a>
-<a class="all-projects" href="/studio">← Все проекты</a><div class="project-label">ТЕКУЩИЙ ПРОЕКТ</div>
-<div class="project-name"><span class="leaf">♧</span><b>СССР<small>Свой сад своими руками</small></b></div>
-<nav aria-label="Проект">{nav}</nav><div class="sidebar-foot"><span class="online"></span> Локальное приложение<small>Рабочие данные · Supabase</small></div></aside>
-<div class="workspace"><header><span>Моё пространство <i>/</i> СССР <i>/</i> <b>{e(title)}</b></span><span class="user">МК</span></header>
+<a class="all-projects" href="/studio">← Все проекты</a><div class="project-label">{scope_label}</div>
+<div class="project-name">{project_name}</div>
+<nav aria-label="Разделы">{nav}</nav><a class="all-projects" href="/studio/library/sources">Общая библиотека →</a><div class="sidebar-foot"><span class="online"></span> Локальное приложение<small>Рабочие данные · Supabase</small></div></aside>
+<div class="workspace"><header><span>Моё пространство <i>/</i> {breadcrumb} <i>/</i> <b>{e(title)}</b></span><span class="user">МК</span></header>
 <main>{notice(message)}{body}<footer>ChannelFactory · Редакционная мастерская <span>Подготовка постов без автоматической отправки</span></footer></main></div></body></html>'''
 
 
@@ -77,12 +83,12 @@ def overview(material_count, posts, counts):
     drafts = [p for p in posts if p.get('status') == 'draft'][:4]
     body += ''.join(f'<a class="record" href="{BASE}/posts/{ident(p["id"])}"><div><b>{e(p.get("title") or "Без названия")}</b><small>Редакционный черновик</small></div><span>→</span></a>' for p in drafts) or '<p class="empty">Пока нет черновиков. Начни с выбора материала.</p>'
     body += '''</section><section class="panel guide"><div class="eyebrow">РЕДАКЦИОННЫЙ ПУТЬ</div><h2>Три шага до готового поста</h2><ol><li><b>Выбери материал</b><p>Открой источник и загрузи содержание.</p></li><li><b>Подготовь черновик</b><p>Сравни текст с оригиналом и проверь предпросмотр.</p></li><li><b>Отметь готовым</b><p>Сохрани проверенный пост для будущей публикации.</p></li></ol></section></div>'''
-    body += notice('Сейчас подключён один проект. Материалы и посты — существующие записи установки; разделение нескольких проектов в базе ещё не реализовано.')
+    body += notice('Сейчас работает один проект. Общие источники и материалы доступны через библиотеку; управление другими проектами пока не подключено.')
     return layout('Обзор', body)
 
 
 def material_list(items, total, offset, limit, query):
-    body = heading('БИБЛИОТЕКА', 'Материалы', f'Всего в библиотеке: {total}. Выбери статью для подготовки поста.')
+    body = heading('ПРОЕКТ СССР', 'Материалы', f'Доступно материалов: {total}. Выбери статью для подготовки поста.', '<a class="button secondary" href="/studio/library/materials">Общая библиотека →</a>')
     body += f'<form class="searchbar" method="get"><label for="search">Поиск по заголовку</label><input id="search" name="q" value="{e(query)}" placeholder="Например, земляника"><button class="button secondary">Найти</button></form>'
     body += '<section class="panel list-panel">'
     for item in items:
