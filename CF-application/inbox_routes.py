@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 import database
 import studio_views as view
 from inbox import InboxError, InboxRepository, ReplyTransport, require_enabled, send_reply
+from inbox_state import read_state
 
 BASE = view.BASE + '/inbox'
 router = APIRouter(default_response_class=HTMLResponse)
@@ -31,6 +32,12 @@ def error(text, status=503):
     return HTMLResponse(page('<section class="panel"><h1>Обращения</h1>' + view.notice(text) + f'<a href="{BASE}">К обращениям</a></section>'), status_code=status)
 
 
+def receiver_notice():
+    state = read_state(8995624604)['state']
+    label = {'running': 'Работает', 'stopped': 'Остановлен', 'error': 'Ошибка — требуется проверка', 'unknown': 'Состояние не подтверждено'}.get(state, 'Состояние не подтверждено')
+    return view.notice('Получатель сообщений: ' + label + '. Обнови страницу, чтобы увидеть новые обращения.')
+
+
 def guarded(fn):
     @wraps(fn)
     def call(*args, **kwargs):
@@ -49,6 +56,7 @@ def guarded(fn):
 def dialogs(offset: int = Query(0, ge=0)):
     items = repository().dialogs(offset)
     body = view.heading('ПЕРЕПИСКА С ЧИТАТЕЛЯМИ', 'Обращения', 'Личные сообщения каналу. Ответ отправляется только после отдельного подтверждения.')
+    body += receiver_notice()
     body += '<section class="panel">'
     for item in items:
         body += f'<a class="record" href="{BASE}/{item["id"]}"><div><b>Диалог {view.e(str(item["id"])[:8])}</b><small>{view.e(STATES[item["state"]])} · {view.e(item["updated_at"])}</small></div><span>Открыть →</span></a>'
@@ -69,6 +77,7 @@ def dialog(dialog_id: UUID, offset: int = Query(0, ge=0)):
     messages = repo.messages(dialog_id, offset)
     replies = repo.replies(dialog_id)
     body = f'<a href="{BASE}">← Обращения</a><h1>Переписка с читателем · {str(dialog_id)[:8]}</h1><p>{view.e(STATES[item["state"]])}</p>'
+    body += receiver_notice()
     for msg in reversed(messages):
         body += '<section class="panel"><h2>Сообщение читателя</h2><small>' + view.e(msg['sent_at']) + '</small><p style="white-space:pre-wrap">' + view.e(msg['text']) + '</p></section>'
     if offset:

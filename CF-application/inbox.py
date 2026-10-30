@@ -54,21 +54,45 @@ class InboxReader(TelegramReader):
 
 
 def receive_batch(repo, reader, bot_id):
-    """Один пакет. Offset берётся только из атомарно сохранённого состояния БД.
+    """Совместимость с прежним явным запуском одного пакета."""
+    return receive_loop(repo, reader, bot_id, max_batches=1)
 
-Захват БД без автоматического истечения защищает от параллельных получателей.
-После аварии старый процесс необходимо остановить до ручного снятия захвата.
-"""
+
+def receive_loop(repo, reader, bot_id, *, max_batches=None, stopped=lambda: False,
+                 progress=lambda **values: None):
+    """Один захват на весь цикл; каждый следующий offset только из ответа БД.
+
+    SIGINT/SIGTERM вызывающий код превращает в флаг остановки. Уже полученный
+    пакет сохраняется до освобождения захвата. Ошибка останавливает цикл без
+    сетевых повторов; аварийный захват автоматически не перехватывается.
+    """
     require_enabled('CF_INBOX_RECEIVE_ENABLED')
+    if max_batches is not None and (type(max_batches) is not int or max_batches < 1):
+        raise InboxError('Некорректное число пакетов.')
     token = str(uuid4())
     config = repo.rpc('acquire', bot_id=bot_id, token=token)
     try:
         if not isinstance(config, dict) or config.get('bot_id') != bot_id:
             raise InboxError('Не подтверждён захват получателя.')
+        offset = config['next_offset']
+        if offset is not None and (type(offset) is not int or offset < 0):
+            raise InboxError('Некорректный сохранённый курсор.')
         reader.preflight(bot_id, config['chat_id'])
-        updates = reader.read_batch(config['next_offset'])
-        next_offset = repo.rpc('store', bot_id=bot_id, token=token, updates=updates)
-        return {'received': len(updates), 'next_offset': next_offset}
+        batches = 0
+        total = 0
+        while not stopped() and (max_batches is None or batches < max_batches):
+            progress(state='running', phase='waiting', received=total)
+            updates = reader.read_batch(offset)
+            progress(state='running', phase='saving', received=total)
+            saved = repo.rpc('store', bot_id=bot_id, token=token, updates=updates)
+            expected = max([u['update_id'] + 1 for u in updates] + [offset or 0])
+            if ((saved is None and expected != 0)
+                    or (saved is not None and (type(saved) is not int or saved < expected))):
+                raise InboxError('Не подтверждён сохранённый курсор. Получение остановлено.')
+            offset = saved
+            total += len(updates)
+            batches += 1
+        return {'received': total, 'next_offset': offset}
     finally:
         repo.rpc('release', bot_id=bot_id, token=token)
 
