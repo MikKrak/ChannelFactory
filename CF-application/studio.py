@@ -44,7 +44,16 @@ def missing():
 
 @router.get('/studio')
 def projects():
-    return view.projects()
+    # Только существующие чтения; при недоступности данных не рисуем ложные нули.
+    try:
+        from library import enabled, LibraryRepository
+        total = db.count_materials()
+        selected = LibraryRepository(db.db).materials(project='cccp')[1] if enabled() else total
+        snapshot = {'materials':total,'selected':selected,'draft':db.count_posts('draft'),'ready':db.count_posts('ready')}
+    except Exception as error:
+        logger.warning('Factory counters unavailable (%s)',type(error).__name__)
+        snapshot = None
+    return view.projects(snapshot)
 
 
 @router.get(view.BASE)

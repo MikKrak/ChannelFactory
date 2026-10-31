@@ -20,6 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from publication_routes import router as publication_router
 from inbox_routes import router as inbox_router
 from library_routes import router as library_router
+from workspace_routes import router as workspace_router
+from rss_filter_routes import router as rss_filter_router
 
 from database import (
     count_materials,
@@ -48,6 +50,8 @@ app.include_router(studio_router)
 app.include_router(publication_router)
 app.include_router(inbox_router)
 app.include_router(library_router)
+app.include_router(workspace_router)
+app.include_router(rss_filter_router)
 
 
 # --- Главная страница ---

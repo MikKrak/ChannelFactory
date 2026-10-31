@@ -1,7 +1,8 @@
 """library.py — общий каталог источников, получение RSS и отбор для проектов.
 
 Не публикует посты и не удаляет материалы. Сеть и хранилище передаются отдельно;
-получение в общую библиотеку не означает автоматического отбора в проект.
+получение в общую библиотеку само по себе не отбирает материал в проект.
+Автоотбор включается отдельно сохранёнными правилами связи источник ↔ проект.
 """
 import os
 from datetime import datetime, timezone
@@ -68,6 +69,13 @@ class LibraryRepository:
             raise ValueError('Страница RSS должна быть от 1 до 100.')
         articles = fetch(page=page, feed_url=source['location'])
         materials = prepare_materials(articles, source_id=str(source_id))
+        from rss_filter_service import enabled as filters_enabled, FilterRepository
+        if filters_enabled():
+            # Один URL — одна классификация. RPC проверяет версии до любых записей.
+            materials=list({m['url']:m for m in materials}.values())
+            plans=FilterRepository(self.db).import_plans(source_id,materials)
+            result=self.db.rpc('cf_filter_import',{'p_source':str(source_id),'p_location':source['location'],'p_materials':materials,'p_plans':plans}).execute().data
+            return {'received':len(materials),'saved':result['saved'],'selected':result['selected']}
         count = self.db.rpc('cf_library_import', {'p_source':str(source_id),'p_location':source['location'],'p_materials':materials}).execute().data
         return {'received':len(materials),'saved':count}
 

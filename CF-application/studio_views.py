@@ -13,7 +13,7 @@ STATUSES = {'draft': 'Черновик', 'ready': 'Готов к публика�
 
 def e(value):
     """Экранировать значения перед выводом в HTML и атрибутах."""
-    return escape(str(value or ''), quote=True)
+    return escape(str(value if value is not None else ''), quote=True)
 
 
 def url(value):
@@ -38,45 +38,38 @@ def notice(text, kind='info'):
     return f'<div class="notice {e(kind)}" role="status">{e(text)}</div>' if text else ''
 
 
-def layout(title, body, active='overview', message='', global_scope=False):
-    """Общая оболочка всех экранов, с обычными серверными ссылками."""
-    nav = ''.join(f'<a class="{"active" if active == key else ""}" href="{href}"><span>{symbol}</span>{label}</a>' for key, href, symbol, label in [
-        ('overview', BASE, '◫', 'Обзор проекта'),
-        ('materials', BASE + '/materials', '▤', 'Материалы'),
-        ('sources', BASE + '/sources', '◉', 'Источники'),
-        ('posts', BASE + '/posts', '▣', 'Редакционные посты'),
-        ('inbox', BASE + '/inbox', '✉', 'Обращения')])
-    if global_scope:
-        nav = '<a href="/studio/library/sources">Источники</a><a href="/studio/library/materials">Общие материалы</a><a href="/studio/library/cleanup">Просмотр очистки</a>'
-    scope_label = 'ОБЩАЯ БИБЛИОТЕКА' if global_scope else 'ТЕКУЩИЙ ПРОЕКТ'
-    project_name = '<b>Библиотека фабрики</b>' if global_scope else '<span class="leaf">♧</span><b>СССР<small>Свой сад своими руками</small></b>'
-    breadcrumb = 'Общая библиотека' if global_scope else 'СССР'
-    return f'''<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>{e(title)} · ChannelFactory</title>
-<link rel="stylesheet" href="/static/studio.css"><script defer src="/static/studio.js"></script></head><body>
-<aside class="sidebar"><a class="brand" href="/studio"><span class="brandmark">↗</span>ChannelFactory</a>
-<a class="all-projects" href="/studio">← Все проекты</a><div class="project-label">{scope_label}</div>
-<div class="project-name">{project_name}</div>
-<nav aria-label="Разделы">{nav}</nav><a class="all-projects" href="/studio/library/sources">Общая библиотека →</a><div class="sidebar-foot"><span class="online"></span> Локальное приложение<small>Рабочие данные · Supabase</small></div></aside>
-<div class="workspace"><header><span>Моё пространство <i>/</i> {breadcrumb} <i>/</i> <b>{e(title)}</b></span><span class="user">МК</span></header>
-<main>{notice(message)}{body}<footer>ChannelFactory · Редакционная мастерская <span>Подготовка постов без автоматической отправки</span></footer></main></div></body></html>'''
+def layout(title, body, active='overview', message='', global_scope=False, context=None):
+    """Передать существующую страницу единой оболочке фабрики/проекта."""
+    from workspace_views import render
+    return render(title, body, active, message, global_scope, context)
 
 
 def heading(kicker, title, subtitle='', action=''):
     return f'<div class="heading"><div><div class="eyebrow">{e(kicker)}</div><h1>{e(title)}</h1><p class="muted">{e(subtitle)}</p></div>{action}</div>'
 
 
-def projects():
-    body = heading('ТВОЁ РАБОЧЕЕ ПРОСТРАНСТВО', 'Проекты', 'Открой проект, чтобы продолжить редакционную работу.')
-    body += f'''<div class="project-grid"><a class="project-card" href="{BASE}"><div class="project-cover"><span>♧</span><small>САД И ОГОРОД</small></div><div class="project-card-body"><span class="badge ready">Подключён</span><h2>{PROJECT}</h2><p class="muted">Материалы, черновики и готовые посты в одном рабочем месте.</p><div class="project-bottom">Telegram · @cccp_service_bot <b>Открыть →</b></div></div></a>
-<div class="project-placeholder"><span>＋</span><h3>Другие проекты</h3><p>Добавление проектов появится после согласования их хранения и разделения данных.</p></div></div>'''
-    return layout('Проекты', body, active='')
+def projects(snapshot=None):
+    """Оперативный пульт: единственный реальный проект и общие ресурсы."""
+    body = heading('ФАБРИКА', 'Рабочий пульт', 'Проекты и общие ресурсы в одном пространстве.')
+    body += '<section class="panel factory-projects"><div class="section-heading"><h2>Проекты</h2><span class="muted">1 действующий проект</span></div>'
+    body += f'<div class="factory-project-row"><div><span class="badge ready">Действующий</span><h3><a href="{BASE}" data-resume-space="cccp">{PROJECT}</a></h3><p class="muted">Материалы · Редакция · Обращения</p></div>'
+    if snapshot is not None:
+        body += '<dl class="project-metrics">' + ''.join(f'<div><dt>{label}</dt><dd>{e(snapshot[key])}</dd></div>' for key,label in [('selected','Материалы проекта'),('draft','Черновики'),('ready','Готовые')]) + '</dl>'
+    else:
+        body += '<p class="muted">Счётчики сейчас недоступны. Открой раздел проекта для проверки.</p>'
+    body += f'<a class="button" href="{BASE}" data-resume-space="cccp">Открыть проект →</a></div></section>'
+    body += '<div class="section-heading resource-heading"><h2>Общие ресурсы</h2><span class="muted">Принадлежат фабрике</span></div><div class="factory-resources">'
+    total = f'Материалов: {snapshot["materials"]}. ' if snapshot is not None else ''
+    for href, symbol, title, text in [('/studio/library/sources','◉','Источники','Общий каталог и подключения к проектам.'),('/studio/library/materials','▤','Материалы',total+'Получение и отбор для проектов — отдельно.'),('/studio/library/cleanup','⌕','Просмотр очистки','Только просмотр кандидатов, без удаления.')]:
+        body += f'<a class="panel resource-card" href="{href}"><span class="resource-symbol">{symbol}</span><h3>{title}</h3><p class="muted">{e(text)}</p><span class="resource-open">Открыть →</span></a>'
+    body += '</div><p class="hint">Сейчас работает один проект. Управление другими проектами и будущие инструменты пока не подключены.</p>'
+    return layout('Пульт фабрики', body, global_scope=True)
 
 
 def overview(material_count, posts, counts):
     body = heading('ПРОЕКТ · САД И ОГОРОД', PROJECT, 'От интересного материала к готовой публикации.', f'<a class="button" href="{BASE}/materials">Выбрать материал →</a>')
     body += '<div class="stats">' + ''.join(f'<a class="stat" href="{href}"><span>{label}</span><strong>{number}</strong><small>{hint}</small></a>' for label, number, hint, href in [
-        ('Материалы', material_count, 'В общей библиотеке установки', BASE + '/materials'),
+        ('Материалы', material_count, 'Отобрано для этого проекта', BASE + '/materials'),
         ('Черновики', counts['draft'], 'Можно продолжить редактирование', BASE + '/posts?status=draft'),
         ('Готовые посты', counts['ready'], 'Готовность текста · результат в журнале', BASE + '/posts?status=ready')]) + '</div>'
     body += '<div class="two-panels"><section class="panel"><div class="section-heading"><h2>Продолжить работу</h2><a href="'+BASE+'/posts">Все посты →</a></div>'
@@ -130,7 +123,7 @@ def material_page(article, draft=None, text=None, error='', message=''):
         body += f'<details><summary>Прочитать исходную статью</summary><div class="prose original">{e(content["text"])}</div></details>'
     else:
         body += f'<p class="muted">Полный текст ещё не загружен. Можно загрузить его с сайта или написать пост вручную.</p><form method="post" action="{BASE}/materials/{ident(article["id"])}/load"><button class="button secondary">Загрузить содержание статьи</button></form>'
-    return layout('Подготовка поста', body+'</section>', 'materials', message)
+    return layout('Подготовка поста', body+'</section>', 'materials', message, context={'kind':'Материал проекта','title':article.get('title') or 'Без названия','fields':[('Дата публикации',(article.get('published_at') or '')[:10]),('Содержание','Загружено' if content.get('text') else 'Ещё не загружено')],'links':[('Оригинал',article.get('url')),('Материалы проекта',BASE+'/materials')]})
 
 
 def post_list(items, status, offset, limit):
@@ -166,4 +159,4 @@ def post_page(post, text=None, error='', message='', article=None, publication='
         body += '<section class="panel source-panel"><h2>Твой несохранённый текст</h2><p class="muted">Скопируй его перед повторным открытием редактора.</p><textarea readonly rows="10" style="width:100%">' + e(submitted_text) + '</textarea></section>'
     if article:
         body += '<section class="panel source-panel"><h2>Исходная статья</h2><details><summary>Сравнить с оригиналом</summary><div class="prose original">' + e((article.get('content') or {}).get('text') or 'Текст статьи ещё не загружен.') + '</div></details></section>'
-    return layout('Редактор поста', body + publication, 'posts', message)
+    return layout('Редактор поста', body + publication, 'posts', message, context={'kind':'Редакционный пост','title':post.get('title') or 'Без названия','fields':[('Статус',STATUSES.get(post.get('status'),post.get('status'))),('Изменён',(post.get('updated_at') or '')[:16].replace('T',' '))],'links':[('Редакционные посты',BASE+'/posts')]})

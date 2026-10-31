@@ -24,8 +24,8 @@ def repository():
     return InboxRepository(database.db)
 
 
-def page(body):
-    return view.layout('Обращения', body, 'inbox')
+def page(body, context=None):
+    return view.layout('Обращения', body, 'inbox', context=context)
 
 
 def error(text, status=503):
@@ -112,7 +112,7 @@ def dialog(dialog_id: UUID, offset: int = Query(0, ge=0)):
 <button class="button">Сохранить и проверить ответ</button><p>Этот шаг ничего не отправляет.</p></form></section>'''
     if offset == 0 and messages:
         body += f'<form method="post" action="{BASE}/{dialog_id}/state"><input type="hidden" name="seen_message" value="{messages[0]["id"]}"><button class="button secondary" name="state" value="handled">Отметить обработанным</button> <button class="button secondary" name="state" value="new">Вернуть в новые</button></form>'
-    return page(body)
+    return page(body, context={'kind':'Диалог проекта','title':'Переписка с читателем','fields':[('Состояние',STATES[item['state']]),('Обновлён',item.get('updated_at') or '—')],'links':[('Все обращения',BASE)]})
 
 
 @router.post(BASE + '/{dialog_id}/prepare')

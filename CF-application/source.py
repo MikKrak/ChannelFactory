@@ -11,6 +11,7 @@ source.py — получение списка статей из выбранно
 import requests
 import feedparser
 from email.utils import parsedate_to_datetime
+from rss_filter import plain
 
 # --- Адрес источника ---
 
@@ -39,6 +40,9 @@ def get_articles(page=2, feed_url=RSS_URL):
             "title": item.get("title", ""),
             "url": item.get("link", ""),
             "published": item.get("published", ""),
+            "description": plain(item.get("summary") or " ".join(x.get("value", "") for x in item.get("content", []))),
+            "categories": list(dict.fromkeys(plain(tag.get("term", ""), 200) for tag in item.get("tags", []) if tag.get("term"))),
+            "available_fields": sorted(str(key) for key in item.keys()),
         }
         for item in feed.entries
     ]
@@ -60,10 +64,11 @@ def prepare_materials(articles, source_id=SOURCE_ID):
         published = article.get("published", "")
 
         # Дату RSS переводим в ISO; отсутствие даты сохраняем как None.
-        published_at = (
-            parsedate_to_datetime(published).isoformat()
-            if published else None
-        )
+        try:
+            published_at = parsedate_to_datetime(published).isoformat() if published else None
+        except (ValueError, TypeError, OverflowError):
+            # Неразобранная дата остаётся в raw_data, материал не теряется.
+            published_at = None
 
         materials.append(
             {

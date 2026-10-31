@@ -11,8 +11,9 @@ def base(project):
     return v.BASE if project else '/studio/library'
 
 
-def shell(title, body, project=False, message=''):
-    return v.layout(title,body,'sources',message,global_scope=not project)
+def shell(title, body, project=False, message='', context=None):
+    active = {'Общая библиотека':'materials','Просмотр очистки':'cleanup'}.get(title,'sources')
+    return v.layout(title,body,active,message,global_scope=not project,context=context)
 
 
 def tabs(project):
@@ -49,12 +50,15 @@ def source_page(item=None, project=False, message=''):
         uses=', '.join(x.get('cf_projects',{}).get('name',x['project_code']) for x in item.get('projects',[])) or 'Ни одного'
         body+=f'<section class="panel"><h2>Использующие проекты</h2><p>{v.e(uses)}</p><p class="hint">Изменения общей карточки видны всем использующим её проектам. Отключение сохраняет материалы и посты.</p></section>'
         if item['kind']=='rss':
+            from rss_filter_service import available as filters_available
+            if filters_available():
+                body+=f'<section class="panel"><h2>Тематический отбор проекта</h2><p>Исследуй рубрики RSS, настрой правила и проверь их без изменения материалов.</p><a class="button secondary" href="/studio/library/sources/{sid}/filter?project=cccp">Настроить RSS-фильтр →</a></section>'
             body+=f'<section class="panel"><h2>Получить материалы в общую библиотеку</h2><p>Получение не добавляет материалы в проекты. Уже известные URL повторно не создаются и не перезаписываются.</p><p class="muted">Последняя загрузка: {v.e(item.get("last_import_at") or "ещё не было")} · добавлено: {v.e(item.get("last_import_count") or 0)}</p><form method="post" action="{root}/sources/{sid}/import"><label>Страница RSS <input type="number" name="page" min="1" max="100" value="1" required></label> <button class="button secondary">Получить RSS</button></form></section>'
         else:
             body+=v.notice('Источник зарегистрирован. Загрузка для этого типа ещё не реализована.')
         if project and conn:
-            body+=f'<section class="panel"><h2>Настройки только для СССР</h2><form method="post" action="{root}/sources/{sid}/settings"><div class="library-form"><label><input type="checkbox" name="enabled" value="yes" {"checked" if conn["enabled"] else ""}> Допускать отбор материалов</label><label>Фраза в заголовке<input name="keyword" maxlength="200" value="{v.e(conn["keyword"])}"></label><p class="hint">Пустое поле — любые заголовки. Поиск буквальной фразы без учёта регистра; применяется при нажатии «Отобрать».</p><label>Заметки проекта<textarea name="notes" maxlength="2000">{v.e(conn["notes"])}</textarea></label></div><button class="button secondary">Сохранить настройки проекта</button></form><hr><form method="post" action="{root}/sources/{sid}/select"><p>Отобрать уже полученные материалы по сохранённым настройкам. Содержание не копируется.</p><button class="button">Отобрать в СССР</button></form></section>'
-    return shell('Карточка источника',body,project,message)
+            body+=f'<section class="panel"><h2>Настройки только для СССР</h2><form method="post" action="{root}/sources/{sid}/settings"><div class="library-form"><label><input type="checkbox" name="enabled" value="yes" {"checked" if conn["enabled"] else ""}> Допускать отбор материалов</label>{f'<input type="hidden" name="keyword" value="{v.e(conn["keyword"])}"><p class="hint">Тематические условия задаются в мастере RSS-фильтра; прежняя простая фраза здесь больше не применяется.</p>' if conn.get('filter_rules') else f'<label>Фраза в заголовке<input name="keyword" maxlength="200" value="{v.e(conn["keyword"])}"></label><p class="hint">Пустое поле — любые заголовки. Поиск буквальной фразы без учёта регистра; применяется при нажатии «Отобрать».</p>'}<label>Заметки проекта<textarea name="notes" maxlength="2000">{v.e(conn["notes"])}</textarea></label></div><button class="button secondary">Сохранить настройки проекта</button></form><hr>{f'<p>Настроен тематический фильтр. Старые материалы не перепривязываются автоматически.</p><a href="/studio/library/sources/{sid}/filter?project=cccp">Проверить правила →</a>' if conn.get('filter_rules') else f'<form method="post" action="{root}/sources/{sid}/select"><p>Отобрать уже полученные материалы по сохранённым настройкам. Содержание не копируется.</p><button class="button">Отобрать в СССР</button></form>'}</section>'
+    return shell('Карточка источника',body,project,message,context={'kind':'Общий источник','title':item.get('name') or 'Новый источник','fields':[('Тип',KINDS[item['kind']]),('Расположение',item.get('location') or 'Не задано'),('Используется',', '.join(x.get('cf_projects',{}).get('name',x['project_code']) for x in item.get('projects',[])) or 'Пока не подключён'),('Загрузка','Ручной RSS' if item['kind']=='rss' else 'Адаптер ещё не реализован')],'links':[('Общие источники','/studio/library/sources'),('Источники СССР',v.BASE+'/sources')]})
 
 
 def material_list(items,total,offset=0,search='',message=''):

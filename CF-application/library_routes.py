@@ -92,7 +92,9 @@ def register_sources(project):
         item=repo.source(source_id)
         if project:
             item['connection']=next((x for x in item['projects'] if x['project_code']=='cccp'),None)
-        return view.source_page(item,project,f'Получено: {result["received"]}; новых материалов: {result["saved"]}. Отбор в проект выполняется отдельно.')
+        message=f'Получено: {result["received"]}; новых материалов: {result["saved"]}. '
+        message+=(f'По сохранённым фильтрам добавлено ссылок в проекты: {result["selected"]}. Сомнительные не отбирались автоматически.' if 'selected' in result else 'Отбор в проект выполняется отдельно.')
+        return view.source_page(item,project,message)
 
 register_sources(False)
 register_sources(True)
