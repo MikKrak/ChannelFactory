@@ -51,7 +51,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         page=BeautifulSoup(response.text,'html.parser')
         self.assertEqual(page.select_one('form.filter-workform')['data-unsaved'],'true')
         self.assertEqual(len(page.select('.result-group')),3)
-        self.assertIn('Временный предпросмотр',response.text)
+        self.assertIn('временный предпросмотр',response.text)
 
     def test_project_route_retains_validation_and_version_guard(self):
         response=self.client.get(self.path)
@@ -78,6 +78,24 @@ class SourceWorkspaceTests(unittest.TestCase):
         shared=BeautifulSoup(library_views.source_page(item),'html.parser')
         self.assertTrue(shared.select('form[action$="/save"]'))
         self.assertFalse(shared.select('form[action$="/settings"],form[action$="/connect"]'))
+
+    def test_compact_heading_accessible_touch_help_and_visible_state(self):
+        response=self.client.get(self.path)
+        page=BeautifulSoup(response.text,'html.parser')
+        self.assertIn('source-settings',page.body['class'])
+        self.assertEqual(len(page.select('.filter-top h1')),1)
+        self.assertFalse(page.select('.filter-top p'))
+        self.assertEqual(len(page.select('details.filter-help > summary[aria-label][title]')),3)
+        self.assertEqual(page.select_one('.filter-mode').get_text(),'Фильтр не настроен')
+        buttons={x.get_text() for x in page.select('button[name=action]')}
+        self.assertTrue({'Получить свежую выборку','Проверить на материалах библиотеки','Проверить отбор'} <= buttons)
+        token=page.select_one('[name=token]')['value']
+        response=self.client.post(self.path,data={'action':'test','token':token,'include_categories':'Сад и огород'})
+        header=BeautifulSoup(response.text,'html.parser').select_one('.filter-summary-counts')
+        self.assertIn('Подходит: 1',header.get_text())
+        self.assertIn('Не подходит: 1',header.get_text())
+        self.assertIn('Сомнительно: 1',header.get_text())
+        self.assertIsNone(self.repo.rule)
 
     def test_field_labels_and_unknown_fields_are_not_guessed(self):
         from rss_filter_views import field_reference

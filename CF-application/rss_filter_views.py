@@ -32,8 +32,13 @@ def field_reference(fields):
     return '<details class="rss-fields"><summary>Доступные данные RSS</summary>'+''.join(f'<h3>{v.e(group)}</h3><ul>'+''.join(rows)+'</ul>' for group,rows in groups.items())+'</details>'
 
 
+def pane_heading(title,help_text):
+    """Нативная раскрываемая подсказка: мышь, клавиатура и касание, без JS."""
+    return f'<div class="filter-pane-title"><h2>{v.e(title)}</h2><details class="filter-help"><summary aria-label="Справка: {v.e(title)}" title="{v.e(help_text)}">ⓘ</summary><div role="note">{v.e(help_text)}</div></details></div>'
+
+
 def research(profile,label):
-    body=f'<section class="panel filter-pane" aria-label="Исследование источника"><header><h2>Исследование</h2><p class="hint">{v.e(label)} · {profile["total"]} записей. Выборка, не весь архив.</p><div class="filter-actions"><button class="button secondary" name="action" value="analyze">Анализировать RSS</button><button class="button secondary" name="action" value="stored">Взять загруженные</button></div></header><div class="filter-scroll" tabindex="0" aria-label="Поля и рубрики RSS">'
+    body='<section class="panel filter-pane" aria-label="Данные источника"><header>'+pane_heading('Данные источника','Свежая выборка читается у источника. Проверка на материалах библиотеки использует уже полученные записи. Эти команды не импортируют и не меняют материалы. Выборка ограничена, это не весь архив.')+f'<p class="filter-sample-label">{v.e(label)} · {profile["total"]} записей</p><div class="filter-actions"><button class="button secondary" name="action" value="analyze">Получить свежую выборку</button><button class="button secondary" name="action" value="stored">Проверить на материалах библиотеки</button></div></header><div class="filter-scroll" tabindex="0" aria-label="Поля и рубрики источника">'
     body+=field_reference(profile['fields'])
     if profile['categories']:
         body+='<h3>Рубрики в выборке</h3><div class="filter-categories">'
@@ -45,18 +50,23 @@ def research(profile,label):
 
 
 def rule_editor(rules,connection,is_demo):
-    body='<section class="panel filter-pane" aria-label="Правила проекта"><header><h2>Правила проекта</h2><p class="hint">В этом варианте найденная исключающая рубрика или фраза запрещает материал, даже если он совпал с включением.</p></header><div class="filter-scroll" tabindex="0" aria-label="Поля правил"><div class="filter-rule-grid">'
+    saved=connection.get('filter_rules')
+    state='Фильтр не настроен' if not saved else 'Автоотбор включён' if saved.get('auto_select') and connection.get('enabled') else 'Автоотбор выключен'
+    body='<section class="panel filter-pane" aria-label="Настройка отбора"><header>'+pane_heading('Настройка отбора','Текущие правила: найденная исключающая рубрика или фраза запрещает материал даже при совпадении с включением. Проверка временная. Сохранение правил само по себе не запускает получение или отбор материалов.')+f'<p class="filter-mode" role="status">{state}</p></header><div class="filter-scroll" tabindex="0" aria-label="Поля правил"><div class="filter-rule-grid">'
     for field in FIELDS:
         body+=f'<label>{FIELD_LABELS[field]}<textarea id="{field}" name="{field}" maxlength="6000" rows="3" placeholder="Одно условие на строку">{v.e(chr(10).join(rules[field]))}</textarea></label>'
     body+='</div><p class="hint">Внутри поля достаточно одного совпадения. Рубрики сравниваются по названию, фразы — соседние слова.</p>'
     body+=f'<label>Между рубриками и словами <select name="combine"><option value="all" {"selected" if rules["combine"]=="all" else ""}>Обе группы (И)</option><option value="any" {"selected" if rules["combine"]=="any" else ""}>Любая группа (ИЛИ)</option></select></label><p class="hint">Пустая группа не ограничивает отбор.</p><p><label><input type="checkbox" name="match_forms" value="yes" {"checked" if rules["match_forms"] else ""}> Учитывать близкие словоформы</label></p><p class="hint">Эвристика русских окончаний, без понимания смысла. Возможны ошибки; ё/е равнозначны.</p>'
     body+=f'<details><summary>Сохранение · версия {connection.get("filter_revision",0)}</summary><p><label><input type="checkbox" name="auto_select" value="yes" {"checked" if rules["auto_select"] else ""}> Применять автоматически при штатном RSS-импорте</label></p><p class="hint">Только новые принятые материалы. Сохранение не запускает импорт и не меняет прежние связи.</p><p><label><input type="checkbox" name="confirmed" value="yes"> Подтверждаю сохранение проверенных правил. Уже существующие связи не изменять.</label></p><button class="button secondary" name="action" value="save">Сохранить фильтр</button><p class="hint">Сначала проверь текущие правила. {"Демо хранит их только в памяти." if is_demo else "Рабочая конфигурация меняется только этой командой."}</p></details>'
-    return body+'</div><footer><button class="button" name="action" value="test">Проверить фильтр</button></footer></section>'
+    return body+'</div><footer><button class="button" name="action" value="test">Проверить отбор</button></footer></section>'
 
 
 def results(entries,preview):
-    body='<section class="panel filter-pane" aria-label="Результаты теста"><header><h2>Результаты теста</h2><p class="hint">Временный предпросмотр. Материалы и связи не меняются; результаты в базу не записываются.</p></header><div class="filter-scroll" tabindex="0" aria-label="Список результатов">'
-    if preview is None:return body+'<p class="muted">Задай правила и нажми «Проверить фильтр».</p></div></section>'
+    body='<section class="panel filter-pane" aria-label="Результаты проверки"><header>'+pane_heading('Результаты проверки','Это временный предпросмотр, а не сохранённые рабочие результаты. Материалы и проектные связи не меняются; результаты проверки в базу не записываются. Раскрой название, чтобы посмотреть материал.')
+    if preview is not None:
+        body+='<div class="filter-summary-counts">'+''.join(f'<span class="filter-state {key}">{name}: {sum(x["state"]==key for x in preview)}</span>' for key,name in LABELS.items())+'</div>'
+    body+='</header><div class="filter-scroll" tabindex="0" aria-label="Список результатов">'
+    if preview is None:return body+'<p class="muted">Задай правила и нажми «Проверить отбор».</p></div></section>'
     for state,name in LABELS.items():
         rows=[(entry,result) for entry,result in zip(entries,preview) if result['state']==state]
         body+=f'<details class="result-group" open><summary><span class="filter-state {state}">{name}: {len(rows)}</span></summary>'
@@ -71,7 +81,7 @@ def page(source,projects,project,connection,rules,token,label,entries,preview=No
     path=root(source,project)
     selected=next((x for x in projects if x['code']==project),None)
     name=selected['name'] if selected else 'Проект не найден'
-    body=f'<div class="filter-workspace"><div class="filter-top"><div><a class="back" href="/studio/{v.ident(project)}/sources">← Источники проекта</a><h1>{v.e(source["name"])}</h1><p class="hint">Настройка подключения · {v.e(name)} · только исследование и правила</p></div><a href="/studio/library/sources/{v.ident(source["id"])}">Общие сведения источника ↗</a></div>'
+    body=f'<div class="filter-workspace"><div class="filter-top"><a class="back" href="/studio/{v.ident(project)}/sources" aria-label="Вернуться в источники проекта">←</a><h1>{v.e(source["name"])}</h1><a class="filter-shared-link" href="/studio/library/sources/{v.ident(source["id"])}">Общие сведения ↗</a></div>'
     if is_demo:body+=v.notice('ТЕСТОВЫЙ РЕЖИМ. Публичные снимки; сохранение только в памяти процесса, без рабочей базы.')
     if not selected or not connection:
         body+=v.notice('Подключи источник в разделе «Источники проекта». Настройка не создаёт связей автоматически.')
@@ -80,7 +90,7 @@ def page(source,projects,project,connection,rules,token,label,entries,preview=No
         body+=f'<form method="post" action="{path}" class="filter-workform" data-unsaved="{str(unsaved).lower()}"><input type="hidden" name="project" value="{v.e(project)}"><input type="hidden" name="token" value="{v.e(token)}"><input type="hidden" name="revision" value="{connection.get("filter_revision",0)}"><div class="filter-columns">'+research(profile,label)+rule_editor(rules,connection,is_demo)+results(entries,preview)+'</div></form>'
     body+='</div><script defer src="/static/rss-filter.js"></script><link rel="stylesheet" href="/static/rss-filter.css">'
     context={'kind':'Подключение источника','title':source['name'],'fields':[('Проект',name),('Расположение',source.get('location','')),('Сохранённая версия',str((connection or {}).get('filter_revision',0)))],'links':[('Общие сведения источника','/studio/library/sources/'+str(source['id'])),('Сохранённые сомнительные',path+'/review')]}
-    return v.layout('Настройка источника',body,'sources',message,context=context)
+    return v.layout('Настройка источника',body,'sources',message,context=context).replace('class="workbench"','class="workbench source-settings"',1)
 
 
 def review(source,project,items,is_demo=False):

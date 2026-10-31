@@ -40,7 +40,7 @@ def wizard(source_id:UUID,project:str=Query('',max_length=40),saved:bool=False):
     try:
         repo,source,projects,project,conn=context(source_id,project)
         entries=repo.entries(source_id)
-        label='Тестовая копия уже загруженных публичных материалов (до 200)' if service.demo() else 'Уже загруженные материалы (до 200)'
+        label='Библиотека · тестовый снимок' if service.demo() else 'Материалы библиотеки'
         token=service.samples.put(source_id,project,entries,label)
         return view.page(source,projects,project,conn,normalize_rules((conn or {}).get('filter_rules') or {}),token,label,entries,message='Правила сохранены. Существующие материалы и связи не менялись.' if saved else '',is_demo=service.demo())
     except ValueError as exc:return error_page(str(exc))
@@ -71,7 +71,7 @@ def action(source_id:UUID,project:str=Form(...,max_length=40),token:str=Form('',
         rules=normalize_rules(values)
         if action in ('analyze','stored'):
             entries=repo.analyze_feed(source) if action=='analyze' else repo.entries(source_id)
-            label=('Публичный RSS-снимок, без импорта' if service.demo() else 'Текущая первая страница RSS, только чтение') if action=='analyze' else 'Уже загруженные материалы (в демо — тестовая копия публичных полей)'
+            label=('Свежая выборка · тестовый снимок' if service.demo() else 'Свежая выборка') if action=='analyze' else ('Материалы библиотеки · тестовый снимок' if service.demo() else 'Материалы библиотеки')
             token=service.samples.put(source_id,project,entries,label)
             sample=service.samples.get(token,source_id,project);preview=None
         else:
