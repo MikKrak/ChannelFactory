@@ -31,3 +31,9 @@ assert.equal(state.spaces.cccp.panels.left,true);
 assert.deepEqual(cleanState({version:999,spaces:state.spaces},origin).spaces.factory.tabs,[]);
 for (const broken of [null,[],{},'broken',{version:1,spaces:{factory:{tabs:'bad',panels:null}}}]) assert.doesNotThrow(()=>cleanState(broken,origin));
 console.log('Workspace model: routes, safe restore, separated spaces and panel bounds passed');
+
+// Настройка принадлежит проекту; восстановление вкладки никогда не вызывает POST.
+assert.equal(route('/studio/cccp/sources/'+id+'/filter',origin).space,'cccp');
+assert.equal(route('/studio/cccp/sources/'+id+'/filter',origin).href,'/studio/cccp/sources/'+id+'/filter');
+assert.equal(route('/studio/cccp/sources/'+id+'/filter/review',origin).space,'cccp');
+assert.equal(route('/studio/cccp/sources/'+id+'/filter/save',origin).href,'/studio/cccp/sources');

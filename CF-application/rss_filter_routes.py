@@ -14,6 +14,7 @@ from rss_filter import classify, normalize_rules, rule_hash
 router=APIRouter(default_response_class=HTMLResponse)
 log=logging.getLogger(__name__)
 PATH='/studio/library/sources/{source_id}/filter'
+PROJECT_PATH='/studio/{project}/sources/{source_id}/filter'
 
 
 def repository():
@@ -35,7 +36,6 @@ def error_page(text,status=422):
     return HTMLResponse(view.v.layout('Фильтр RSS',view.v.notice(text,'error'),'sources',global_scope=True),status_code=status)
 
 
-@router.get(PATH)
 def wizard(source_id:UUID,project:str=Query('',max_length=40),saved:bool=False):
     try:
         repo,source,projects,project,conn=context(source_id,project)
@@ -47,6 +47,18 @@ def wizard(source_id:UUID,project:str=Query('',max_length=40),saved:bool=False):
     except Exception as exc:
         log.warning('RSS filter opening failed (%s)',type(exc).__name__)
         return error_page('Не удалось прочитать настройки. Рабочая миграция могла ещё не быть подключена.',503)
+
+
+@router.get(PATH)
+def legacy_wizard(source_id:UUID,project:str=Query('',max_length=40),saved:bool=False):
+    if not project:
+        return error_page('Открой настройку из источников нужного проекта.')
+    return RedirectResponse(f'/studio/{view.v.ident(project)}/sources/{source_id}/filter'+('?saved=true' if saved else ''),status_code=303)
+
+
+@router.get(PROJECT_PATH)
+def project_wizard(source_id:UUID,project:str,saved:bool=False):
+    return wizard(source_id,project,saved)
 
 
 @router.post(PATH)
@@ -70,7 +82,7 @@ def action(source_id:UUID,project:str=Form(...,max_length=40),token:str=Form('',
                 if confirmed!='yes':raise ValueError('Подтверди сохранение правил отдельной галочкой.')
                 if rule_hash(rules) not in sample['tested']:raise ValueError('Сначала проверь текущую конфигурацию кнопкой «Проверить фильтр».')
                 repo.save(source_id,project,revision,rules)
-                return RedirectResponse(f'/studio/library/sources/{source_id}/filter?project={view.v.ident(project)}&saved=true',status_code=303)
+                return RedirectResponse(f'/studio/{view.v.ident(project)}/sources/{source_id}/filter?saved=true',status_code=303)
             else:raise ValueError('Неизвестная команда.')
         unsaved=rule_hash(rules)!=rule_hash(conn.get('filter_rules') or {})
         return view.page(source,projects,project,conn,rules,token,sample['label'],sample['entries'],preview,is_demo=service.demo(),unsaved=unsaved)
@@ -98,3 +110,14 @@ def review(source_id:UUID,project:str=Query(...,max_length=40)):
     except Exception as exc:
         log.warning('RSS filter review failed (%s)',type(exc).__name__)
         return error_page('Не удалось прочитать результаты. Предпросмотр мастера не записывает их в базу.',503)
+
+
+@router.post(PROJECT_PATH)
+def project_action(source_id:UUID,project:str,token:str=Form('',max_length=40),revision:int=Form(0,ge=0),action_name:str=Form(...,alias='action'),include_categories:str=Form('',max_length=6000),exclude_categories:str=Form('',max_length=6000),include_words:str=Form('',max_length=6000),exclude_words:str=Form('',max_length=6000),combine:str=Form('all'),match_forms:str=Form(''),auto_select:str=Form(''),confirmed:str=Form('')):
+    # Контекст задаёт адрес проекта; одноимённое поле POST не может его сменить.
+    return action(source_id,project,token,revision,action_name,include_categories,exclude_categories,include_words,exclude_words,combine,match_forms,auto_select,confirmed)
+
+
+@router.get(PROJECT_PATH+'/review')
+def project_review(source_id:UUID,project:str):
+    return review(source_id,project)

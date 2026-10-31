@@ -55,7 +55,8 @@ def register_sources(project):
     @router.get(root+'/new',name='new_project_source' if project else 'new_source')
     @guarded
     def new():
-        return view.source_page(project=project)
+        if project:return redirect("/studio/library/sources/new")
+        return view.source_page()
 
     @router.get(root+'/{source_id}',name='project_source' if project else 'source')
     @guarded
