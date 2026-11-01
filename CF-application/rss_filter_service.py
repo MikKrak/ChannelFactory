@@ -7,6 +7,7 @@ import copy
 import json
 import os
 import time
+import threading
 from pathlib import Path
 from uuid import uuid4
 from source import get_articles, SOURCE_ID
@@ -58,23 +59,26 @@ class FilterRepository:
         for row in rows:
             rules=row.get('filter_rules')
             if row['enabled'] and rules and rules.get('auto_select'):
-                plans.append({'project':row['project_code'],'revision':row['filter_revision'],'decisions':[{'url':m['url'],**classify(m,rules)} for m in materials]})
+                plans.append({'project':row['project_code'],'revision':row['filter_revision'],**({'rules_version':2} if rules.get('version')==2 else {}),'decisions':[{'url':m['url'],**classify(m,rules)} for m in materials]})
         return plans
 
 
 class DemoRepository:
     """Снимок публичного RSS и правила в памяти; ни одного рабочего запроса/изменения."""
-    def __init__(self,entries,stored=None):self.sample=copy.deepcopy(entries);self.stored=copy.deepcopy(entries if stored is None else stored);self.rule=None;self.revision=0
-    def projects(self):return [{'code':'cccp','name':'СССР — тестовая копия настроек'}]
+    def __init__(self,entries,stored=None):self.sample=copy.deepcopy(entries);self.stored=copy.deepcopy(entries if stored is None else stored);self.rule=None;self.revision=0;self._lock=threading.Lock()
+    def projects(self):return [{'code':'cccp','name':'СССР — Свой сад своими руками · тестовая копия'}]
     def source(self,sid):return {'id':str(sid),'name':'Ботаничка · публичный RSS-снимок','kind':'rss','location':'https://www.botanichka.ru/feed/'} if str(sid)==SOURCE_ID else None
     def connection(self,sid,project):
         if project!='cccp':return None
-        return {'filter_rules':copy.deepcopy(self.rule),'filter_revision':self.revision,'enabled':True}
+        with self._lock:
+            return {'filter_rules':copy.deepcopy(self.rule),'filter_revision':self.revision,'enabled':True}
     def entries(self,sid):return copy.deepcopy(self.stored)
     def analyze_feed(self,source):return copy.deepcopy(self.sample)
     def save(self,sid,project,revision,rules):
-        if project!='cccp' or revision!=self.revision:raise ValueError('Правила изменились. Открой мастер заново.')
-        self.rule=normalize_rules(rules);self.revision+=1;return self.revision
+        normalized=normalize_rules(rules)
+        with self._lock:
+            if project!='cccp' or revision!=self.revision:raise ValueError('Правила изменились. Открой мастер заново.')
+            self.rule=normalized;self.revision+=1;return self.revision
     def results(self,sid,project,state):return []
 
 _demo_repository=None

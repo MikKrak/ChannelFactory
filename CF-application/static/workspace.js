@@ -216,7 +216,7 @@
   });
 
   // Предупреждаем и для источника/ответа, не только для редактора поста.
-  const forms = Array.from(document.forms).filter(form => form.method.toLowerCase() === 'post');
+  const forms = Array.from(document.forms).filter(form => form.method.toLowerCase() === 'post' && form.dataset.autosave !== 'true');
   const values = form => JSON.stringify(Array.from(form.elements).filter(el => el.name && !el.disabled && !['hidden', 'submit', 'button'].includes(el.type)).map(el => [el.name, ['checkbox', 'radio'].includes(el.type) ? el.checked : el.value]));
   const initial = new Map(forms.map(form => [form, values(form)]));
   const submitting = new Set();

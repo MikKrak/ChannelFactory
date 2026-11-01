@@ -52,6 +52,8 @@ app.include_router(inbox_router)
 app.include_router(library_router)
 app.include_router(workspace_router)
 app.include_router(rss_filter_router)
+from rss_filter_config_routes import router as filter_config_router
+app.include_router(filter_config_router)
 
 
 # --- Главная страница ---

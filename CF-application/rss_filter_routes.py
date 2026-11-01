@@ -58,7 +58,8 @@ def legacy_wizard(source_id:UUID,project:str=Query('',max_length=40),saved:bool=
 
 @router.get(PROJECT_PATH)
 def project_wizard(source_id:UUID,project:str,saved:bool=False):
-    return wizard(source_id,project,saved)
+    from rss_filter_config_routes import enabled,open_page
+    return open_page(source_id,project) if enabled() else wizard(source_id,project,saved)
 
 
 @router.post(PATH)

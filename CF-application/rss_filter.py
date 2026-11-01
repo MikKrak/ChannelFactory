@@ -40,6 +40,9 @@ def tokens(value, forms=False):
 
 def normalize_rules(raw):
     """Ограниченная конфигурация, без регулярных выражений и кода пользователя."""
+    if isinstance(raw,dict) and raw.get('version')==2:
+        from rss_filter_config import normalize
+        return normalize(raw)
     if not isinstance(raw,dict):raise ValueError('Правила должны быть объектом.')
     rules={'version':1,'combine':raw.get('combine','all'),'match_forms':raw.get('match_forms',True),'auto_select':raw.get('auto_select',True)}
     if rules['combine'] not in ('all','any') or type(rules['match_forms']) is not bool or type(rules['auto_select']) is not bool:
@@ -80,6 +83,9 @@ def entry_data(entry):
 
 def classify(entry,rules):
     """Исключения имеют приоритет; неполные нужные поля дают «сомнительно»."""
+    if isinstance(rules,dict) and rules.get('version')==2:
+        from rss_filter_config import classify as classify_config
+        return classify_config(entry,rules)
     r=normalize_rules(rules);data=entry_data(entry)
     categories={normal(x) for x in data['categories']}
     reasons=[];unknown=[]

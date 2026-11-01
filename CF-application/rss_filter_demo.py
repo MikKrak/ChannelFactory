@@ -16,11 +16,21 @@ if os.environ.get('CF_RSS_FILTER_DEMO')!='1':raise RuntimeError('Demo mode must 
 app=FastAPI(title='ChannelFactory — безопасная демонстрация RSS-фильтра')
 app.mount('/static',StaticFiles(directory=str(Path(__file__).parent/'static')),name='static')
 app.include_router(rss_filter_routes.router)
+from rss_filter_config_routes import router as config_router
+app.include_router(config_router)
 MASTER=f'/studio/library/sources/{SOURCE_ID}/filter?project=cccp'
 
 @app.get('/')
 @app.get('/studio')
 def home():return RedirectResponse(MASTER,status_code=303)
+
+@app.get('/studio/cccp/sources',response_class=HTMLResponse)
+def demo_sources():
+    import library_views
+    import rss_filter_service as service
+    repo=service.repository(None);item=repo.source(SOURCE_ID)
+    item.update(projects=[{'project_code':'cccp','cf_projects':{'name':repo.projects()[0]['name']}}],connection=repo.connection(SOURCE_ID,'cccp'))
+    return library_views.source_list([item],True,'Демонстрация: рабочие подключения и операции здесь недоступны.')
 
 @app.get('/{path:path}',response_class=HTMLResponse)
 def demo_navigation(path:str):
