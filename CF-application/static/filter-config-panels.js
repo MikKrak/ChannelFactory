@@ -16,16 +16,17 @@
   const box=document.getElementById('config-panels'),divider=document.getElementById('config-divider'),key='cf.filter-panels.v1:'+form.dataset.endpoint;
   let saved;try{saved=JSON.parse(localStorage.getItem(key));}catch(_){}
   const layout=new Layout(saved);
-  function render(){const state=layout.visible();box.dataset.editor=String(state.editor);box.dataset.results=String(state.results);box.style.setProperty('--config-ratio',state.ratio+'%');divider.hidden=!(state.editor&&state.results);divider.setAttribute('aria-valuenow',String(Math.round(state.ratio)));
+  function render(){const state=layout.visible();form.dataset.both=String(state.editor&&state.results);box.dataset.editor=String(state.editor);box.dataset.results=String(state.results);box.style.setProperty('--config-ratio',state.ratio+'%');divider.hidden=!(state.editor&&state.results);divider.setAttribute('aria-valuenow',String(Math.round(state.ratio)));
     for(const panel of ['editor','results']){
       document.getElementById('config-'+panel+'-pane').hidden=!state[panel];
-      document.querySelector('[data-panel-show="'+panel+'"]').setAttribute('aria-pressed',String(state[panel]));
+      document.querySelectorAll('[data-panel-show="'+panel+'"]').forEach(b=>{b.hidden=state[panel];b.setAttribute('aria-expanded',String(state[panel]));b.setAttribute('aria-controls','config-'+panel+'-pane');});
       const b=document.querySelector('[data-panel-max="'+panel+'"]'),restore=layout.max===panel,label=restore?'Восстановить':'Развернуть: '+(panel==='editor'?'Настройка фильтра':'Результаты');b.textContent=restore?'❐':'⛶';b.setAttribute('title',label);b.setAttribute('aria-label',label);
     }
+    document.getElementById('config-panel-recovery').hidden=state.editor||state.results;
     try{localStorage.setItem(key,JSON.stringify(layout.normal));}catch(_){}
   }
-  document.querySelectorAll('[data-panel-show]').forEach(b=>b.addEventListener('click',()=>{layout.show(b.dataset.panelShow,!layout.visible()[b.dataset.panelShow]);render();}));
-  document.querySelectorAll('[data-panel-hide]').forEach(b=>b.addEventListener('click',()=>{layout.show(b.dataset.panelHide,false);render();document.querySelector('[data-panel-show="'+b.dataset.panelHide+'"]').focus();}));
+  document.querySelectorAll('[data-panel-show]').forEach(b=>b.addEventListener('click',()=>{layout.show(b.dataset.panelShow,true);render();}));
+  document.querySelectorAll('[data-panel-hide]').forEach(b=>b.addEventListener('click',()=>{layout.show(b.dataset.panelHide,false);render();[...document.querySelectorAll('[data-panel-show="'+b.dataset.panelHide+'"]')].find(x=>x.getClientRects().length)?.focus();}));
   document.querySelectorAll('[data-panel-max]').forEach(b=>b.addEventListener('click',()=>{layout.maximize(b.dataset.panelMax);render();}));
   divider.addEventListener('keydown',e=>{let value=layout.normal.ratio;if(e.key==='ArrowLeft')value-=2;else if(e.key==='ArrowRight')value+=2;else if(e.key==='Home')value=25;else if(e.key==='End')value=75;else return;e.preventDefault();layout.resize(value);render();});
   divider.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();divider.setPointerCapture(e.pointerId);divider.classList.add('dragging');});

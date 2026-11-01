@@ -2,13 +2,13 @@
    Этот модуль не вызывает импорт, публикацию или изменение проектных материалов. */
 (() => {
   'use strict';
-  const M=window.FilterConfigModel, form=document.getElementById('config-form');if(!M||!form)return;
+  const M=window.FilterConfigModel,C=window.FilterCategoryModel, form=document.getElementById('config-form');if(!M||!C||!form)return;
   const initial=JSON.parse(document.getElementById('config-initial').textContent), endpoint=form.dataset.endpoint;
   const fields=['include_categories','exclude_categories','include_words','exclude_words'];
   const status=document.getElementById('config-save-status'), errorBox=document.getElementById('config-error'), retry=document.getElementById('config-retry');
   const knownCategories=new Map(initial.profile.categories.map(([c])=>[M.key(c),c]));
   const draftKey='cf.filter-draft.v2:'+location.origin+endpoint;
-  let generation=0,token=initial.token,profile=initial.profile,proposal=null,converted=!initial.state.conversion_required,leaving=false,pendingHref=null,blocked=false,serverButton=null,unconfirmedRestore=false,sampleBusy=false,loadedKind='library';
+  let generation=0,token=initial.token,profile=initial.profile,recommendations=initial.recommendations||[],converted=!initial.state.conversion_required,leaving=false,pendingHref=null,blocked=false,serverButton=null,unconfirmedRestore=false,sampleBusy=false,loadedKind='library';
   async function request(path,body){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(endpoint+path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,signal:controller.signal});const data=await r.json();if(!r.ok){const e=new Error(data.error||'Запрос не подтверждён.');e.status=r.status;throw e;}return data;}catch(e){if(e.name==='AbortError')throw new Error('Сервер не ответил вовремя. Черновик остаётся в этом браузере.');if(e instanceof TypeError)throw new Error('Сервер недоступен. Черновик остаётся в этом браузере.');throw e;}finally{clearTimeout(timer);}}
   const queue=new M.Queue(initial.state,(rules,revision)=>request('/config',{rules,revision,accept_conversion:converted}),()=>request('/config'));
   function collect(){const r={...M.clone(initial.state.rules)};fields.forEach(k=>r[k]=form.elements[k].value.split('\n').map(x=>x.trim()).filter(Boolean));r.filter_enabled=queue.saved.filter_enabled;r.match_forms=form.elements.match_forms.checked;r.category_default=form.elements.category_default.value;r.combine=form.elements.combine.value;return r;}
@@ -17,24 +17,32 @@
   function clearDraft(){try{localStorage.removeItem(draftKey);}catch(_){}}
   function report(message){if(serverButton)serverButton.hidden=!blocked;errorBox.textContent=message;errorBox.hidden=false;retry.hidden=blocked;status.textContent='Ошибка сохранения';}
   function validate(r){if(!converted)throw new Error('Сначала выбери создание нового варианта. Прежние правила не изменены.');if(blocked)throw new Error('Есть конкурирующая версия. Сначала открой сохранённые настройки.');for(const k of fields){if(r[k].length>50||r[k].some(x=>x.length>100))throw new Error('В каждом поле не более 50 условий по 100 символов.');if(k.endsWith('words')&&r[k].some(x=>{const words=x.match(/[\p{L}\p{N}]+/gu)||[];return !words.length||words.length>12;}))throw new Error('Нужны слова или короткие фразы до 12 слов.');}if(r.include_categories.some(x=>r.exclude_categories.some(y=>M.key(x)===M.key(y))))throw new Error('Убери рубрику из одного из двух полей: она не может быть включена и исключена одновременно.');}
-  function rememberCategories(r){
-    const names=new Map([...knownCategories,...[...r.include_categories,...r.exclude_categories].map(c=>[M.key(c),c])]);
-    const included=[],excluded=[];for(const c of names.values())(M.included(c,r)?included:excluded).push(c);
-    return {...r,include_categories:included,exclude_categories:excluded};
+  function rememberCategories(r){return C.remember(r,[...knownCategories.values()]);}
+  function applyCategory(category,on,origin){
+    knownCategories.set(M.key(category),category);
+    fill(rememberCategories(M.setCategory(collect(),category,on)));changed();commit().catch(()=>{});
+    if(origin){const box=document.getElementById(origin),input=[...box.querySelectorAll('input[data-category]')].find(x=>M.key(x.dataset.category)===M.key(category));(input||box).focus({preventScroll:true});}
   }
   function renderCategories(){
-    const r=collect(),box=document.getElementById('config-categories'),counts=new Map(profile.categories.map(([c,n])=>[M.key(c),n]));
-    for(const c of [...r.include_categories,...r.exclude_categories,...profile.categories.map(([c])=>c)])knownCategories.set(M.key(c),c);
-    box.replaceChildren();let selected=0;
-    for(const category of knownCategories.values()){
-      const label=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span'),count=document.createElement('small');
-      input.type='checkbox';input.checked=M.included(category,r);if(input.checked)selected++;name.textContent=category;count.textContent=counts.has(M.key(category))?String(counts.get(M.key(category))):'нет в выборке';
-      input.addEventListener('change',()=>{fill(rememberCategories(M.setCategory(collect(),category,input.checked)));changed();commit().catch(()=>{});});
-      label.append(input,name,count);box.append(label);
+    const r=collect(),counts=new Map(profile.categories.map(([c,n])=>[M.key(c),n]));
+    for(const c of C.names(r.include_categories,r.exclude_categories,profile.categories.map(([c])=>c),recommendations))knownCategories.set(M.key(c),c);
+    const rows=C.views([...knownCategories.values()],r,recommendations,document.getElementById('config-show-recommended').checked);
+    function renderList(id,items,empty){
+      const box=document.getElementById(id);box.replaceChildren();
+      for(const row of items){
+        const label=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span');
+        input.type='checkbox';input.checked=row.on;input.dataset.category=row.name;name.textContent=row.name;
+        input.addEventListener('change',()=>applyCategory(row.name,input.checked,id));label.append(input,name);
+        if(counts.has(M.key(row.name))){const count=document.createElement('small');count.textContent=String(counts.get(M.key(row.name)));label.append(count);}
+        box.append(label);
+      }
+      if(!items.length){const p=document.createElement('p');p.className='hint';p.textContent=empty;box.append(p);}
     }
-    const all=document.getElementById('config-all');all.checked=knownCategories.size?selected===knownCategories.size:r.category_default==='include';all.indeterminate=selected>0&&selected<knownCategories.size;
-    all.setAttribute('aria-checked',all.indeterminate?'mixed':String(all.checked));
-    if(!knownCategories.size){const p=document.createElement('p');p.className='hint';p.textContent='Рубрик пока нет. Список загружается автоматически; при ошибке нажми ↻ рядом с ним или добавь название вручную. Текстовые условия доступны сразу.';box.append(p);}
+    renderList('config-categories',rows.all,'Рубрик пока нет. Список загружается автоматически; при ошибке нажми ↻ или добавь название вручную.');
+    renderList('config-selected-categories',rows.selected,document.getElementById('config-show-recommended').checked?'Нет выбранных или рекомендованных рубрик. Выбери рубрики в общем списке.':'Нет выбранных рубрик. Выбери их слева или включи показ рекомендаций.');
+    const selected=rows.all.filter(x=>x.on).length,all=document.getElementById('config-all');
+    all.checked=rows.all.length?selected===rows.all.length:r.category_default==='include';all.indeterminate=selected>0&&selected<rows.all.length;all.setAttribute('aria-checked',all.indeterminate?'mixed':String(all.checked));
+    document.querySelectorAll('[data-result-category]').forEach(input=>input.checked=M.included(input.dataset.resultCategory,r));
   }
   function changed(){if(document.querySelector('#config-results .filter-summary-counts')){document.getElementById('config-test-note').textContent='Условия изменились. Результаты предыдущие — повтори проверку.';document.getElementById('config-results').classList.add('config-stale');}generation++;persist();errorBox.hidden=true;retry.hidden=true;status.textContent='Ввод не завершён';renderCategories();}
   async function commit(navigating=false){const gen=generation,r=collect();if(generation===0&&M.same(r,queue.saved)){status.textContent=queue.configured?'Сохранено':'Настройка ещё не сохранена';return queue.saved;}persist();try{if(navigating&&unconfirmedRestore)throw new Error('Восстановленный черновик ещё не завершён. Закончи поле или перейди, сохранив его локально.');validate(r);unconfirmedRestore=false;status.textContent=queue.configured&&M.same(r,queue.saved)?'Сохранено':'Сохраняется…';await queue.save(r);if(gen===generation){fill(queue.saved);clearDraft();status.textContent='Сохранено';errorBox.hidden=true;retry.hidden=true;}}catch(e){persist();if(e.status===409)blocked=true;report(e.message||'Не удалось сохранить. Черновик оставлен в этом браузере.');throw e;}}
@@ -56,8 +64,15 @@
     field.value='';fill(r);changed();commit().catch(()=>{});
   });
   const conversion=document.getElementById('config-convert');if(conversion)conversion.addEventListener('click',()=>{converted=true;document.getElementById('config-conversion').hidden=true;changed();commit().catch(()=>{});});
-  function showSuggestion(p){proposal=p;const box=document.getElementById('config-suggestion');box.hidden=!p;if(p)box.querySelector('p').textContent='Включать только: '+p.categories.join(', ')+'. Остальные рубрики — исключать. Включение фильтра не меняется. '+p.reason;}
-  document.querySelector('#config-suggestion button').addEventListener('click',()=>{if(!proposal)return;const r=M.all(collect(),false);r.include_categories=proposal.categories;fill(rememberCategories(r));showSuggestion(null);changed();commit().catch(()=>{});});
+  // Видимость выбранного списка и рекомендаций — предпочтения интерфейса, не правила.
+  const selectedKey='cf.filter-selected.v1:'+endpoint,selectedPane=document.getElementById('config-selected-pane');
+  let selectedOpen=true;try{selectedOpen=localStorage.getItem(selectedKey)!=='false';}catch(_){}
+  function showSelected(on){selectedOpen=on;selectedPane.hidden=!on;document.getElementById('config-category-workspace').dataset.selectedOpen=String(on);document.getElementById('config-selected-show').hidden=on;try{localStorage.setItem(selectedKey,String(on));}catch(_){}}
+  document.getElementById('config-selected-hide').addEventListener('click',()=>{showSelected(false);document.getElementById('config-selected-show').focus();});
+  document.getElementById('config-selected-show').addEventListener('click',()=>{showSelected(true);document.getElementById('config-selected-hide').focus();});
+  document.getElementById('config-show-recommended').addEventListener('change',renderCategories);
+  showSelected(selectedOpen);
+  document.getElementById('config-results').addEventListener('change',e=>{if(e.target.matches('[data-result-category]'))applyCategory(e.target.dataset.resultCategory,e.target.checked);});
   async function loadSample(kind){
     if(sampleBusy)return;sampleBusy=true;const referenceStatus=document.getElementById('config-reference-status');referenceStatus.textContent='Загружаются рубрики и поля источника…';document.querySelectorAll('[data-sample]').forEach(x=>x.disabled=true);document.getElementById('config-test').disabled=true;document.getElementById('config-sample-kind').disabled=true;
     try{
@@ -65,12 +80,12 @@
       document.getElementById('config-results').classList.add('config-stale');
       document.getElementById('config-test-note').textContent='Выборка обновлена. Нажми «Обновить» для проверки.';
       document.getElementById('config-sample-label').textContent=data.label+' · '+profile.total+' записей';document.getElementById('config-sample-kind').value=kind;
-      renderCategories();showSuggestion(data.suggestion);document.getElementById('config-fields').innerHTML=data.fields_html;document.getElementById('config-editor-fields').innerHTML=data.fields_html;referenceStatus.textContent='Рубрик в выборке: '+profile.categories.length+' · записей: '+profile.total+'. Выбор рубрик не изменён.';document.getElementById('config-source-profile').innerHTML=data.source_html;
+      recommendations=data.recommendations||[];renderCategories();document.getElementById('config-fields').innerHTML=data.fields_html;document.getElementById('config-editor-fields').innerHTML=data.fields_html;referenceStatus.textContent='Рубрик в выборке: '+profile.categories.length+' · записей: '+profile.total+'. Выбор рубрик не изменён.';document.getElementById('config-source-profile').innerHTML=data.source_html;
     }catch(e){document.getElementById('config-sample-kind').value=loadedKind;referenceStatus.textContent='Не удалось загрузить рубрики и поля. Нажми ↻ для повторной загрузки. Сохранённые правила доступны.';}finally{sampleBusy=false;document.querySelectorAll('[data-sample]').forEach(x=>x.disabled=false);document.getElementById('config-test').disabled=false;document.getElementById('config-sample-kind').disabled=false;}
   }
   document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>loadSample(b.dataset.sample)));
   document.getElementById('config-sample-kind').addEventListener('change',e=>loadSample(e.target.value));
-  document.getElementById('config-test').addEventListener('click',async()=>{if(sampleBusy)return;const testedToken=token,testedGeneration=generation;try{const r=collect();validate(r);const data=await request('/test',{token,rules:r});if(token!==testedToken||generation!==testedGeneration){document.getElementById('config-test-note').textContent='Выборка или условия изменились — повтори проверку.';return;}document.getElementById('config-results').innerHTML=data.content_html;document.getElementById('config-results').classList.remove('config-stale');document.getElementById('config-test-note').textContent=data.note;}catch(e){errorBox.hidden=false;errorBox.textContent=e.message;}});
+  document.getElementById('config-test').addEventListener('click',async()=>{if(sampleBusy)return;const testedToken=token,testedGeneration=generation;try{const r=collect();validate(r);const data=await request('/test',{token,rules:r});if(token!==testedToken||generation!==testedGeneration){document.getElementById('config-test-note').textContent='Выборка или условия изменились — повтори проверку.';return;}document.getElementById('config-results').innerHTML=data.content_html;renderCategories();document.getElementById('config-results').classList.remove('config-stale');document.getElementById('config-test-note').textContent=data.note;}catch(e){errorBox.hidden=false;errorBox.textContent=e.message;}});
   const dialog=document.getElementById('config-leave');
   document.getElementById('config-stay').addEventListener('click',()=>dialog.close());
   document.getElementById('config-leave-confirm').addEventListener('click',()=>{dialog.close();leaving=true;location.assign(pendingHref);});

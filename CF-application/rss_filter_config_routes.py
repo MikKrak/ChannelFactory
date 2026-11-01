@@ -9,6 +9,7 @@ from fastapi import APIRouter,Form
 from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse
 from pydantic import BaseModel,Field
 from rss_filter_config import normalize,classify,suggestion
+from rss_filter_recommendations import recommend
 import rss_filter_service as service
 import rss_filter_routes as old
 from rss_filter import analyze
@@ -101,7 +102,7 @@ def sample(source_id:UUID,project:str,payload:Sample):
         selected=next(x for x in projects if x['code']==project)
         from rss_filter_views import field_reference
         from rss_filter_config_views import source_reference
-        return {'token':token,'fields_html':field_reference(profile['fields']),'source_html':source_reference(profile),'profile':profile,'label':service.samples.get(token,source_id,project)['label'],'suggestion':suggestion(selected,[c for c,n in profile['categories']])}
+        return {'token':token,'fields_html':field_reference(profile['fields']),'source_html':source_reference(profile),'profile':profile,'label':service.samples.get(token,source_id,project)['label'],'suggestion':suggestion(selected,[c for c,n in profile['categories']]),'recommendations':recommend(selected,[c for c,n in profile['categories']])}
     except Exception as exc:return failure(exc)
 
 
@@ -114,7 +115,7 @@ def test(source_id:UUID,project:str,payload:Test):
         sample=service.samples.get(payload.token,source_id,project)
         preview=[classify(e,rules,preview=True) for e in sample['entries']]
         from rss_filter_config_views import result_content
-        return {'html':results(sample['entries'],preview),'content_html':result_content(sample['entries'],preview),'note':'Испытание правил, даже когда рабочий фильтр выключен. Результаты временные.'}
+        return {'html':results(sample['entries'],preview),'content_html':result_content(sample['entries'],preview,rules),'note':'Испытание правил, даже когда рабочий фильтр выключен. Результаты временные.'}
     except Exception as exc:return failure(exc)
 
 

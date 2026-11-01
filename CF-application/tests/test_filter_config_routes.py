@@ -132,3 +132,36 @@ class ConfigRouteTests(unittest.TestCase):
         self.assertEqual(page.select_one('form[action$="/activation"] button').get_text(),'Выключить')
         factory=BeautifulSoup(library_views.source_list([item],False),'html.parser')
         self.assertFalse(factory.select('form[action$="/activation"]'))
+
+    def test_test_cards_edit_only_shared_rules_and_keep_preview_temporary(self):
+        from bs4 import BeautifulSoup
+        sample=self.client.post(self.path+'/sample',json={'kind':'fresh'}).json()
+        self.assertIn('recommendations',sample)
+        self.assertIn('Сад и огород',sample['recommendations'])
+        rules=self.client.get(self.path+'/config').json()['rules']
+        rules.update(category_default='exclude',include_categories=['Сад и огород'])
+        response=self.client.post(self.path+'/test',json={'token':sample['token'],'rules':rules})
+        cards=BeautifulSoup(response.json()['content_html'],'html.parser')
+        self.assertTrue(cards.select('.result-material [data-result-category]'))
+        garden=cards.select_one('[data-result-category="Сад и огород"]')
+        self.assertTrue(garden.has_attr('checked'))
+        self.assertFalse(cards.select_one('[data-result-category="Рецепты"]').has_attr('checked'))
+        self.assertFalse(cards.select('form,button,a[href*="/select"],a[href*="/import"],a[href*="/publish"]'))
+        self.assertIn('других материалов',cards.get_text())
+        self.assertEqual(self.repo.revision,0);self.assertIsNone(self.repo.rule)
+        self.assertEqual(self.repo.sample,ENTRIES)
+
+    def test_category_views_recommendations_and_panel_recovery_have_accessible_controls(self):
+        from bs4 import BeautifulSoup
+        page=BeautifulSoup(self.client.get(self.path).text,'html.parser')
+        self.assertTrue(page.select_one('#config-category-workspace [aria-label="Все рубрики"]'))
+        self.assertTrue(page.select_one('#config-selected-pane[aria-label="Выбранные рубрики"]'))
+        self.assertTrue(page.select_one('#config-show-recommended'))
+        self.assertTrue(page.select_one('#config-selected-hide[title][aria-label]'))
+        self.assertTrue(page.select_one('#config-selected-show[title][aria-label]'))
+        self.assertFalse(page.select('.config-panel-bar,#config-suggestion'))
+        for key in ('editor','results'):
+            self.assertTrue(page.select_one(f'#config-panel-recovery [data-panel-show="{key}"][title][aria-label]'))
+            other='results' if key=='editor' else 'editor'
+            self.assertTrue(page.select_one(f'#config-{key}-pane header [data-panel-show="{other}"]'))
+        self.assertIsNone(self.repo.rule)
