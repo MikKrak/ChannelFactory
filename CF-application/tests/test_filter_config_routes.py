@@ -65,3 +65,70 @@ class ConfigRouteTests(unittest.TestCase):
         self.assertEqual(self.client.post(self.path+'/config',json={**data,'accept_conversion':True}).status_code,200)
         with patch.dict(os.environ,{'CF_RSS_FILTER_CONFIG_ENABLED':'0'}):
             self.assertEqual(self.client.get(self.path+'/config').status_code,422)
+
+    def test_editor_panels_inspector_and_no_activation_control(self):
+        from bs4 import BeautifulSoup
+        self.repo.rule={'version':2,'include_categories':['Сохранённая рубрика'],'exclude_categories':['Другая'],'filter_enabled':False}
+        page=BeautifulSoup(self.client.get(self.path).text,'html.parser')
+        self.assertFalse(page.select('[name=filter_enabled]'))
+        self.assertEqual(len(page.select('#config-panels > section')),2)
+        self.assertTrue(page.select_one('#config-results-pane').has_attr('hidden'))
+        self.assertEqual(len(page.select('[data-panel-max]')),2)
+        self.assertTrue(page.select_one('#workspace-inspector [data-sample=fresh]'))
+        self.assertTrue(page.select_one('#config-form [data-sample=fresh]'))
+        self.assertTrue(page.select_one('#config-editor-fields'))
+        self.assertTrue(page.select_one('#config-reference-status[role=status]'))
+        self.assertTrue(page.select_one('#config-divider[role=separator][tabindex]'))
+        self.assertTrue(page.select_one('#config-all'))
+        self.assertFalse(page.select_one('textarea[name=include_categories]').find_parent('label'))
+        self.assertIn('Сохранённая рубрика',page.select_one('#config-initial').text)
+        self.assertEqual(self.repo.revision,0)
+
+    def test_activation_rejects_unprepared_stale_and_invalid_rules(self):
+        response=self.client.post(self.path+'/activation',data={'revision':0,'active':'true'},follow_redirects=False)
+        self.assertIn('filter_message=',response.headers['location']);self.assertIsNone(self.repo.rule)
+        self.repo.rule={'version':2,'filter_enabled':False,'include_words':['x'*101]}
+        self.client.post(self.path+'/activation',data={'revision':0,'active':'true'},follow_redirects=False)
+        self.assertEqual(self.repo.revision,0)
+        self.repo.rule={'version':2,'filter_enabled':False,'include_categories':['Сад']}
+        self.client.post(self.path+'/activation',data={'revision':9,'active':'true'},follow_redirects=False)
+        self.assertEqual(self.repo.revision,0)
+
+    def test_activation_changes_only_flag_and_preserves_disabled_rules(self):
+        from rss_filter_config import normalize
+        self.repo.rule=normalize({'include_categories':['Сад'],'exclude_words':['яд']})
+        original=self.repo.rule.copy()
+        for active in ['true','false']:
+            response=self.client.post(self.path+'/activation',data={'revision':self.repo.revision,'active':active},follow_redirects=False)
+            self.assertEqual(response.status_code,303)
+            self.assertEqual(self.repo.rule,{**original,'filter_enabled':active=='true'})
+        self.assertEqual(self.repo.sample,ENTRIES)
+        self.assertEqual(self.repo.revision,2)
+        with patch.object(self.repo,'connection',return_value={'filter_rules':self.repo.rule,'filter_revision':2,'enabled':False}):
+            response=self.client.post(self.path+'/activation',data={'revision':2,'active':'true'},follow_redirects=False)
+            self.assertEqual(self.repo.revision,2)
+
+    def test_legacy_cannot_enable_and_disable_preserves_conditions(self):
+        from rss_filter import normalize_rules
+        self.repo.rule=normalize_rules({'include_categories':['Сад'],'auto_select':True})
+        original=self.repo.rule.copy()
+        self.client.post(self.path+'/activation',data={'revision':0,'active':'true'},follow_redirects=False)
+        self.assertEqual(self.repo.revision,0)
+        self.client.post(self.path+'/activation',data={'revision':0,'active':'false'},follow_redirects=False)
+        self.assertEqual(self.repo.rule,{**original,'auto_select':False})
+
+    def test_source_list_activation_is_separate_from_connection(self):
+        from bs4 import BeautifulSoup
+        import library_views
+        item={'id':SID,'name':'RSS','kind':'rss','projects':[],'connection':self.repo.connection(SID,'cccp')}
+        page=BeautifulSoup(library_views.source_list([item],True),'html.parser')
+        activation=page.select_one('form[action$="/activation"]')
+        self.assertTrue(activation.select_one('button').has_attr('disabled'))
+        self.assertIn('Не настроен',page.get_text())
+        self.assertTrue(page.find('a',string='Настройка'))
+        self.repo.rule={'version':2,'filter_enabled':True}
+        item['connection']=self.repo.connection(SID,'cccp')
+        page=BeautifulSoup(library_views.source_list([item],True),'html.parser')
+        self.assertEqual(page.select_one('form[action$="/activation"] button').get_text(),'Выключить')
+        factory=BeautifulSoup(library_views.source_list([item],False),'html.parser')
+        self.assertFalse(factory.select('form[action$="/activation"]'))

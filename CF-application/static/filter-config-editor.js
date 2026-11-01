@@ -1,0 +1,82 @@
+/* Завершённые изменения — на сервер, незавершённый ввод — восстановимый локальный черновик.
+   Этот модуль не вызывает импорт, публикацию или изменение проектных материалов. */
+(() => {
+  'use strict';
+  const M=window.FilterConfigModel, form=document.getElementById('config-form');if(!M||!form)return;
+  const initial=JSON.parse(document.getElementById('config-initial').textContent), endpoint=form.dataset.endpoint;
+  const fields=['include_categories','exclude_categories','include_words','exclude_words'];
+  const status=document.getElementById('config-save-status'), errorBox=document.getElementById('config-error'), retry=document.getElementById('config-retry');
+  const knownCategories=new Map(initial.profile.categories.map(([c])=>[M.key(c),c]));
+  const draftKey='cf.filter-draft.v2:'+location.origin+endpoint;
+  let generation=0,token=initial.token,profile=initial.profile,proposal=null,converted=!initial.state.conversion_required,leaving=false,pendingHref=null,blocked=false,serverButton=null,unconfirmedRestore=false,sampleBusy=false,loadedKind='library';
+  async function request(path,body){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);try{const r=await fetch(endpoint+path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined,signal:controller.signal});const data=await r.json();if(!r.ok){const e=new Error(data.error||'Запрос не подтверждён.');e.status=r.status;throw e;}return data;}catch(e){if(e.name==='AbortError')throw new Error('Сервер не ответил вовремя. Черновик остаётся в этом браузере.');if(e instanceof TypeError)throw new Error('Сервер недоступен. Черновик остаётся в этом браузере.');throw e;}finally{clearTimeout(timer);}}
+  const queue=new M.Queue(initial.state,(rules,revision)=>request('/config',{rules,revision,accept_conversion:converted}),()=>request('/config'));
+  function collect(){const r={...M.clone(initial.state.rules)};fields.forEach(k=>r[k]=form.elements[k].value.split('\n').map(x=>x.trim()).filter(Boolean));r.filter_enabled=queue.saved.filter_enabled;r.match_forms=form.elements.match_forms.checked;r.category_default=form.elements.category_default.value;r.combine=form.elements.combine.value;return r;}
+  function fill(r){fields.forEach(k=>form.elements[k].value=r[k].join('\n'));for(const k of ['match_forms'])form.elements[k].checked=r[k];for(const k of ['combine','category_default'])form.elements[k].value=r[k];renderCategories();}
+  function persist(){try{localStorage.setItem(draftKey,JSON.stringify({at:Date.now(),revision:queue.revision,rules:collect()}));return true;}catch(_){return false;}}
+  function clearDraft(){try{localStorage.removeItem(draftKey);}catch(_){}}
+  function report(message){if(serverButton)serverButton.hidden=!blocked;errorBox.textContent=message;errorBox.hidden=false;retry.hidden=blocked;status.textContent='Ошибка сохранения';}
+  function validate(r){if(!converted)throw new Error('Сначала выбери создание нового варианта. Прежние правила не изменены.');if(blocked)throw new Error('Есть конкурирующая версия. Сначала открой сохранённые настройки.');for(const k of fields){if(r[k].length>50||r[k].some(x=>x.length>100))throw new Error('В каждом поле не более 50 условий по 100 символов.');if(k.endsWith('words')&&r[k].some(x=>{const words=x.match(/[\p{L}\p{N}]+/gu)||[];return !words.length||words.length>12;}))throw new Error('Нужны слова или короткие фразы до 12 слов.');}if(r.include_categories.some(x=>r.exclude_categories.some(y=>M.key(x)===M.key(y))))throw new Error('Убери рубрику из одного из двух полей: она не может быть включена и исключена одновременно.');}
+  function rememberCategories(r){
+    const names=new Map([...knownCategories,...[...r.include_categories,...r.exclude_categories].map(c=>[M.key(c),c])]);
+    const included=[],excluded=[];for(const c of names.values())(M.included(c,r)?included:excluded).push(c);
+    return {...r,include_categories:included,exclude_categories:excluded};
+  }
+  function renderCategories(){
+    const r=collect(),box=document.getElementById('config-categories'),counts=new Map(profile.categories.map(([c,n])=>[M.key(c),n]));
+    for(const c of [...r.include_categories,...r.exclude_categories,...profile.categories.map(([c])=>c)])knownCategories.set(M.key(c),c);
+    box.replaceChildren();let selected=0;
+    for(const category of knownCategories.values()){
+      const label=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span'),count=document.createElement('small');
+      input.type='checkbox';input.checked=M.included(category,r);if(input.checked)selected++;name.textContent=category;count.textContent=counts.has(M.key(category))?String(counts.get(M.key(category))):'нет в выборке';
+      input.addEventListener('change',()=>{fill(rememberCategories(M.setCategory(collect(),category,input.checked)));changed();commit().catch(()=>{});});
+      label.append(input,name,count);box.append(label);
+    }
+    const all=document.getElementById('config-all');all.checked=knownCategories.size?selected===knownCategories.size:r.category_default==='include';all.indeterminate=selected>0&&selected<knownCategories.size;
+    all.setAttribute('aria-checked',all.indeterminate?'mixed':String(all.checked));
+    if(!knownCategories.size){const p=document.createElement('p');p.className='hint';p.textContent='Рубрик пока нет. Список загружается автоматически; при ошибке нажми ↻ рядом с ним или добавь название вручную. Текстовые условия доступны сразу.';box.append(p);}
+  }
+  function changed(){if(document.querySelector('#config-results .filter-summary-counts')){document.getElementById('config-test-note').textContent='Условия изменились. Результаты предыдущие — повтори проверку.';document.getElementById('config-results').classList.add('config-stale');}generation++;persist();errorBox.hidden=true;retry.hidden=true;status.textContent='Ввод не завершён';renderCategories();}
+  async function commit(navigating=false){const gen=generation,r=collect();if(generation===0&&M.same(r,queue.saved)){status.textContent=queue.configured?'Сохранено':'Настройка ещё не сохранена';return queue.saved;}persist();try{if(navigating&&unconfirmedRestore)throw new Error('Восстановленный черновик ещё не завершён. Закончи поле или перейди, сохранив его локально.');validate(r);unconfirmedRestore=false;status.textContent=queue.configured&&M.same(r,queue.saved)?'Сохранено':'Сохраняется…';await queue.save(r);if(gen===generation){fill(queue.saved);clearDraft();status.textContent='Сохранено';errorBox.hidden=true;retry.hidden=true;}}catch(e){persist();if(e.status===409)blocked=true;report(e.message||'Не удалось сохранить. Черновик оставлен в этом браузере.');throw e;}}
+  fill(initial.state.rules);
+  status.textContent=initial.state.configured?'Сохранено':'Настройка ещё не сохранена';
+  try{const draft=JSON.parse(localStorage.getItem(draftKey)||'null');if(M.restorable(draft)){fill({...initial.state.rules,...draft.rules});generation++;unconfirmedRestore=true;status.textContent='Черновик восстановлен — заверши изменение поля';if(draft.revision!==queue.revision){blocked=true;report('Сохранённая версия изменилась. Черновик восстановлен для сверки и не будет перезаписан автоматически.');}}}catch(_){status.textContent='Локальное восстановление недоступно';}
+  form.addEventListener('submit',e=>e.preventDefault());
+  form.addEventListener('input',e=>{if(e.target.name)changed();});
+  form.addEventListener('change',e=>{if(e.target.name&&e.target.tagName!=='TEXTAREA')commit().catch(()=>{});});
+  form.addEventListener('focusout',e=>{if(e.target.tagName==='TEXTAREA'&&e.target.name)commit().catch(()=>{});});
+  retry.addEventListener('click',()=>commit().catch(()=>{}));
+  // При конфликте только явный выбор сервера. Старая локальная правка остаётся резервной копией.
+  serverButton=document.createElement('button');serverButton.hidden=!blocked;serverButton.type='button';serverButton.className='button secondary';serverButton.textContent='Открыть сохранённую версию';serverButton.addEventListener('click',async()=>{try{const actual=await request('/config');try{localStorage.setItem(draftKey+':previous',JSON.stringify({rules:collect(),at:Date.now()}));}catch(_){throw new Error('Не удалось сохранить резервный черновик. Скопируй поля перед обновлением.');}queue.revision=actual.revision;queue.saved=M.clone(actual.rules);queue.configured=actual.configured;queue.pending=null;queue.error=null;blocked=false;unconfirmedRestore=false;converted=!actual.conversion_required;fill(actual.rules);clearDraft();status.textContent='Сохранено';errorBox.hidden=true;retry.hidden=true;}catch(e){report(e.message);}});errorBox.after(serverButton);
+  document.getElementById('config-all').addEventListener('change',e=>{fill(rememberCategories(M.all(collect(),e.target.checked)));changed();commit().catch(()=>{});});
+  document.getElementById('config-category-add').addEventListener('click',()=>{
+    const field=document.getElementById('config-category-name'),name=field.value.trim().replace(/\s+/g,' ');if(!name)return;
+    const r=collect();knownCategories.set(M.key(name),name);r.exclude_categories=r.exclude_categories.filter(c=>M.key(c)!==M.key(name));
+    if(!r.include_categories.some(c=>M.key(c)===M.key(name)))r.include_categories.push(name);
+    field.value='';fill(r);changed();commit().catch(()=>{});
+  });
+  const conversion=document.getElementById('config-convert');if(conversion)conversion.addEventListener('click',()=>{converted=true;document.getElementById('config-conversion').hidden=true;changed();commit().catch(()=>{});});
+  function showSuggestion(p){proposal=p;const box=document.getElementById('config-suggestion');box.hidden=!p;if(p)box.querySelector('p').textContent='Включать только: '+p.categories.join(', ')+'. Остальные рубрики — исключать. Включение фильтра не меняется. '+p.reason;}
+  document.querySelector('#config-suggestion button').addEventListener('click',()=>{if(!proposal)return;const r=M.all(collect(),false);r.include_categories=proposal.categories;fill(rememberCategories(r));showSuggestion(null);changed();commit().catch(()=>{});});
+  async function loadSample(kind){
+    if(sampleBusy)return;sampleBusy=true;const referenceStatus=document.getElementById('config-reference-status');referenceStatus.textContent='Загружаются рубрики и поля источника…';document.querySelectorAll('[data-sample]').forEach(x=>x.disabled=true);document.getElementById('config-test').disabled=true;document.getElementById('config-sample-kind').disabled=true;
+    try{
+      const data=await request('/sample',{kind});token=data.token;profile=data.profile;loadedKind=kind;
+      document.getElementById('config-results').classList.add('config-stale');
+      document.getElementById('config-test-note').textContent='Выборка обновлена. Нажми «Обновить» для проверки.';
+      document.getElementById('config-sample-label').textContent=data.label+' · '+profile.total+' записей';document.getElementById('config-sample-kind').value=kind;
+      renderCategories();showSuggestion(data.suggestion);document.getElementById('config-fields').innerHTML=data.fields_html;document.getElementById('config-editor-fields').innerHTML=data.fields_html;referenceStatus.textContent='Рубрик в выборке: '+profile.categories.length+' · записей: '+profile.total+'. Выбор рубрик не изменён.';document.getElementById('config-source-profile').innerHTML=data.source_html;
+    }catch(e){document.getElementById('config-sample-kind').value=loadedKind;referenceStatus.textContent='Не удалось загрузить рубрики и поля. Нажми ↻ для повторной загрузки. Сохранённые правила доступны.';}finally{sampleBusy=false;document.querySelectorAll('[data-sample]').forEach(x=>x.disabled=false);document.getElementById('config-test').disabled=false;document.getElementById('config-sample-kind').disabled=false;}
+  }
+  document.querySelectorAll('[data-sample]').forEach(b=>b.addEventListener('click',()=>loadSample(b.dataset.sample)));
+  document.getElementById('config-sample-kind').addEventListener('change',e=>loadSample(e.target.value));
+  document.getElementById('config-test').addEventListener('click',async()=>{if(sampleBusy)return;const testedToken=token,testedGeneration=generation;try{const r=collect();validate(r);const data=await request('/test',{token,rules:r});if(token!==testedToken||generation!==testedGeneration){document.getElementById('config-test-note').textContent='Выборка или условия изменились — повтори проверку.';return;}document.getElementById('config-results').innerHTML=data.content_html;document.getElementById('config-results').classList.remove('config-stale');document.getElementById('config-test-note').textContent=data.note;}catch(e){errorBox.hidden=false;errorBox.textContent=e.message;}});
+  const dialog=document.getElementById('config-leave');
+  document.getElementById('config-stay').addEventListener('click',()=>dialog.close());
+  document.getElementById('config-leave-confirm').addEventListener('click',()=>{dialog.close();leaving=true;location.assign(pendingHref);});
+  document.addEventListener('click',async e=>{const a=e.target.closest('a[href]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||a.target==='_blank')return;const url=new URL(a.href,location.href);if(url.origin!==location.origin||!url.pathname.startsWith('/studio')||url.href===location.href||a.getAttribute('href').startsWith('#'))return;e.preventDefault();pendingHref=url.href;try{await commit(true);leaving=true;location.assign(pendingHref);}catch(_){const safe=persist();document.getElementById('config-leave-message').textContent=safe?'Изменения пока не сохранены на сервере. Черновик сохранён в этом браузере и восстановится при возвращении.':'Не удалось сохранить черновик. Останься на странице и скопируй введённое.';document.getElementById('config-leave-confirm').hidden=!safe;if(!dialog.open)dialog.showModal();}},true);
+  document.addEventListener('change',async e=>{if(e.target.id!=='project-picker'||!e.target.value)return;const url=new URL(e.target.value,location.href);if(url.origin!==location.origin||!url.pathname.startsWith('/studio'))return;e.stopImmediatePropagation();e.preventDefault();pendingHref=url.href;try{await commit(true);leaving=true;location.assign(pendingHref);}catch(_){const safe=persist();document.getElementById('config-leave-message').textContent=safe?'Черновик сохранён в этом браузере. Можно перейти и вернуться позже.':'Не удалось сохранить черновик. Останься и скопируй поля.';document.getElementById('config-leave-confirm').hidden=!safe;if(!dialog.open)dialog.showModal();}},true);
+  // Только чтение: обновление перечня рубрик не завершает ввод и не вызывает очередь сохранения.
+  loadSample('fresh');
+  window.addEventListener('beforeunload',e=>{if(!leaving&&!M.same(collect(),queue.saved)){persist();e.preventDefault();e.returnValue='';}});
+})();

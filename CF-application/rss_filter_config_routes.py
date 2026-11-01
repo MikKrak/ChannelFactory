@@ -5,8 +5,8 @@
 import os
 import logging
 from uuid import UUID
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse,JSONResponse
+from fastapi import APIRouter,Form
+from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse
 from pydantic import BaseModel,Field
 from rss_filter_config import normalize,classify,suggestion
 import rss_filter_service as service
@@ -100,7 +100,8 @@ def sample(source_id:UUID,project:str,payload:Sample):
         profile=analyze(entries)
         selected=next(x for x in projects if x['code']==project)
         from rss_filter_views import field_reference
-        return {'token':token,'fields_html':field_reference(profile['fields']),'profile':profile,'label':service.samples.get(token,source_id,project)['label'],'suggestion':suggestion(selected,[c for c,n in profile['categories']])}
+        from rss_filter_config_views import source_reference
+        return {'token':token,'fields_html':field_reference(profile['fields']),'source_html':source_reference(profile),'profile':profile,'label':service.samples.get(token,source_id,project)['label'],'suggestion':suggestion(selected,[c for c,n in profile['categories']])}
     except Exception as exc:return failure(exc)
 
 
@@ -112,5 +113,40 @@ def test(source_id:UUID,project:str,payload:Test):
         rules=normalize(payload.rules)
         sample=service.samples.get(payload.token,source_id,project)
         preview=[classify(e,rules,preview=True) for e in sample['entries']]
-        return {'html':results(sample['entries'],preview),'note':'Испытание правил, даже когда рабочий фильтр выключен. Результаты временные.'}
+        from rss_filter_config_views import result_content
+        return {'html':results(sample['entries'],preview),'content_html':result_content(sample['entries'],preview),'note':'Испытание правил, даже когда рабочий фильтр выключен. Результаты временные.'}
     except Exception as exc:return failure(exc)
+
+
+@router.post(PATH+'/activation')
+def activation(source_id:UUID,project:str,revision:int=Form(ge=0),active:bool=Form()):
+    """Меняем только рабочее включение поверх актуальной сохранённой версии.
+
+    Обычная форма не повторяет запрос при неизвестном результате; возврат читает
+    фактическое состояние. Подключение источника и правила отбора не заменяются.
+    """
+    from urllib.parse import urlencode
+    message=''
+    try:
+        repo,*_=context(source_id,project)
+        conn=repo.connection(source_id,project)
+        if not conn:raise ValueError('Источник не подключён к проекту.')
+        if conn.get('filter_revision',0)!=revision:raise ValueError('Настройки уже изменились. Проверь состояние и повтори свой выбор.')
+        raw=conn.get('filter_rules')
+        if not raw:raise ValueError('Сначала подготовь правила: открой «Настройка».')
+        if active and not conn.get('enabled'):raise ValueError('Подключение источника не допущено к отбору. Сначала проверь допуск источника.')
+        if raw.get('version')==2:
+            rules=normalize(raw);rules['filter_enabled']=active
+        else:
+            if active:raise ValueError('Прежние правила нужно проверить в новой настройке перед включением.')
+            from rss_filter import normalize_rules
+            rules=normalize_rules(raw);rules['auto_select']=False
+        repo.save(source_id,project,revision,rules)
+        if repo.connection(source_id,project).get('filter_rules')!=rules:
+            raise ValueError('После сохранения настройки изменились. Проверь текущее состояние.')
+        message='Фильтр включён.' if active else 'Фильтр выключен. Правила сохранены.'
+    except ValueError as exc:message=str(exc)
+    except Exception as exc:
+        log.warning('Filter activation failed (%s)',type(exc).__name__)
+        message='Не удалось подтвердить переключение. Проверь показанное состояние перед повтором.'
+    return RedirectResponse(f'/studio/{project}/sources?'+urlencode({'filter_message':message}),status_code=303)

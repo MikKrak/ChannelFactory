@@ -25,12 +25,12 @@ MASTER=f'/studio/library/sources/{SOURCE_ID}/filter?project=cccp'
 def home():return RedirectResponse(MASTER,status_code=303)
 
 @app.get('/studio/cccp/sources',response_class=HTMLResponse)
-def demo_sources():
+def demo_sources(filter_message:str=""):
     import library_views
     import rss_filter_service as service
     repo=service.repository(None);item=repo.source(SOURCE_ID)
     item.update(projects=[{'project_code':'cccp','cf_projects':{'name':repo.projects()[0]['name']}}],connection=repo.connection(SOURCE_ID,'cccp'))
-    return library_views.source_list([item],True,'Демонстрация: рабочие подключения и операции здесь недоступны.')
+    return library_views.source_list([item],True,filter_message[:300] or 'Демонстрация: рабочие подключения и операции здесь недоступны.')
 
 @app.get('/{path:path}',response_class=HTMLResponse)
 def demo_navigation(path:str):

@@ -49,8 +49,8 @@ def register_sources(project):
 
     @router.get(root,name='project_sources' if project else 'library_sources')
     @guarded
-    def sources():
-        return view.source_list(repository().sources('cccp' if project else None),project)
+    def sources(filter_message:str=""):
+        return view.source_list(repository().sources('cccp' if project else None),project,filter_message[:300])
 
     @router.get(root+'/new',name='new_project_source' if project else 'new_source')
     @guarded

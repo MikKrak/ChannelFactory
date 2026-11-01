@@ -70,7 +70,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         self.assertFalse(factory.select('form[action$="/connect"]'))
         self.assertIn('Проект',factory.get_text())
         project=BeautifulSoup(library_views.source_list([item],True),'html.parser')
-        setup=project.find('a',string='Настроить')
+        setup=project.find('a',string='Настройка')
         self.assertEqual(setup['href'],self.path)
         detail=BeautifulSoup(library_views.source_page(item,True),'html.parser')
         self.assertFalse(detail.select('form[action$="/save"]'))

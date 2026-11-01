@@ -21,6 +21,28 @@ def tabs(project):
     return f'<nav class="tabs"><a href="{root}/sources">Источники</a><a href="/studio/library/materials">Общая библиотека материалов</a><a href="{v.BASE}/materials">Отобрано в СССР</a></nav>'
 
 
+def filter_controls(conn,root,sid):
+    """Состояние правил отдельно от допуска источника; включение только готового v2."""
+    from rss_filter_config import normalize
+    from rss_filter_config_routes import enabled
+    raw=conn.get('filter_rules');ready=False;on=False;reason='Сначала подготовь правила в настройке.'
+    if raw:
+        if raw.get('version')==2:
+            try:
+                rules=normalize(raw);ready=True;on=rules['filter_enabled'];reason=''
+            except ValueError:reason='В правилах есть ошибка. Открой настройку.'
+        else:
+            on=bool(raw.get('auto_select'));reason='Прежние правила требуют проверки в новой настройке.'
+    state='Включён' if on else 'Выключен' if ready else 'Не настроен' if not raw else 'Нужна проверка'
+    if not conn.get('enabled',True):reason='Источник не допущен к отбору.'
+    body=f'<div class="source-filter-control"><small>Допуск источника: {"есть" if conn.get("enabled",True) else "нет"}</small><small><b>Фильтр: {state}</b></small>'
+    if reason:body+=f'<small>{v.e(reason)}</small>'
+    if enabled():
+        unavailable=not on and (not ready or not conn.get('enabled',True))
+        body+=f'<form method="post" action="{root}/sources/{sid}/filter/activation"><input type="hidden" name="revision" value="{int(conn.get("filter_revision",0))}"><input type="hidden" name="active" value="{str(not on).lower()}"><button class="button secondary" {"disabled" if unavailable else ""}>{"Выключить" if on else "Включить"}</button></form>'
+    return body+'</div>'
+
+
 def source_list(items, project=False, message=''):
     root=base(project)
     body=v.heading('ПРОЕКТ' if project else 'ФАБРИКА','Источники проекта' if project else 'Общие источники',
@@ -35,7 +57,9 @@ def source_list(items, project=False, message=''):
             uses=', '.join(x.get('cf_projects',{}).get('name',x['project_code']) for x in item['projects']) or 'Пока не используется'
             body+=f'<div class="record"><div><a href="{root}/sources/{sid}"><b>{v.e(item["name"])}</b></a><small>{v.e(KINDS[item["kind"]])} · {v.e(uses)}</small><small>Последняя загрузка: {v.e(item.get("last_import_at") or "не было")} · новых: {v.e(item.get("last_import_count") or 0)}</small></div>'
             if project and conn:
-                body+=f'<a class="button secondary" href="{root}/sources/{sid}/filter">Настроить</a>' if item['kind']=='rss' else f'<a class="button secondary" href="{root}/sources/{sid}">Настроить</a>'
+                if item['kind']=='rss':
+                    body+=filter_controls(conn,root,sid)
+                body+=f'<a class="button secondary" href="{root}/sources/{sid}/filter">Настройка</a>' if item['kind']=='rss' else f'<a class="button secondary" href="{root}/sources/{sid}">Настройка</a>'
                 body+=f'<form method="post" action="{root}/sources/{sid}/disconnect"><button class="button secondary">Отключить</button></form>'
             elif project:
                 body+=f'<form method="post" action="{root}/sources/{sid}/connect"><button class="button secondary">Подключить</button></form>'
@@ -49,7 +73,7 @@ def source_page(item=None, project=False, message=''):
     root=base(project);sid=v.ident(item['id']);conn=item.get('connection')
     if project and item.get('name'):
         body=f'<a class="back" href="{root}/sources">← Источники проекта</a>'+v.heading('ПОДКЛЮЧЕНИЕ ИСТОЧНИКА',item['name'],'Общие сведения редактируются отдельно в фабрике.')
-        if conn and item['kind']=='rss':body+=f'<a class="button" href="{root}/sources/{sid}/filter">Настроить</a>'
+        if conn and item['kind']=='rss':body+=f'<a class="button" href="{root}/sources/{sid}/filter">Настройка</a>'
         elif not conn:body+=v.notice('Источник ещё не подключён. Подключение доступно в списке источников проекта.')
         else:body+=v.notice('Настройка загрузки для этого типа ещё не реализована.')
         if item['kind']!='rss':body+=v.notice('Настройка загрузки для этого типа ещё не реализована.')
